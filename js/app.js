@@ -103,6 +103,11 @@ class ZupuApp {
         // 选择头像
         document.getElementById('select-avatar-btn')?.addEventListener('click', () => this.selectAvatar());
 
+        // 配偶健在复选框事件
+        document.getElementById('person-spouse-alive')?.addEventListener('change', (e) => {
+            this.onSpouseAliveChanged(e.target.checked);
+        });
+
         // 导出
         document.getElementById('export-btn')?.addEventListener('click', () => this.exportData());
 
@@ -518,6 +523,16 @@ class ZupuApp {
         document.getElementById('person-bio').value = '';
         document.getElementById('person-avatar').value = '';
         
+        // 清空配偶字段
+        document.getElementById('person-spouse-name').value = '';
+        document.getElementById('person-spouse-phone').value = '';
+        document.getElementById('person-spouse-birth-date').value = '';
+        document.getElementById('person-spouse-birth-calendar').value = '公历';
+        document.getElementById('person-spouse-alive').checked = true;
+        document.getElementById('person-spouse-death-date').value = '';
+        document.getElementById('person-spouse-bio').value = '';
+        document.getElementById('spouse-death-group').style.display = 'none';
+        
         // 头像预览重置
         const avatarPreview = document.getElementById('person-avatar-preview');
         avatarPreview.src = '';
@@ -572,6 +587,17 @@ class ZupuApp {
         document.getElementById('person-ranking').value = person.ranking || '';
         document.getElementById('person-bio').value = person.bio || '';
         document.getElementById('person-avatar').value = person.avatar || '';
+        
+        // 填充配偶字段
+        document.getElementById('person-spouse-name').value = person.spouse_name || '';
+        document.getElementById('person-spouse-phone').value = person.spouse_phone || '';
+        document.getElementById('person-spouse-birth-date').value = person.spouse_birth_date || '';
+        document.getElementById('person-spouse-birth-calendar').value = person.spouse_birth_calendar || '公历';
+        const spouseAlive = person.spouse_alive !== undefined ? (person.spouse_alive === 1) : true;
+        document.getElementById('person-spouse-alive').checked = spouseAlive;
+        document.getElementById('person-spouse-death-date').value = person.spouse_death_date || '';
+        document.getElementById('person-spouse-bio').value = person.spouse_bio || '';
+        document.getElementById('spouse-death-group').style.display = spouseAlive ? 'none' : 'block';
         
         // 头像预览
         const avatarPreview = document.getElementById('person-avatar-preview');
@@ -632,7 +658,14 @@ class ZupuApp {
             father_id: document.getElementById('person-father').value || null,
             ranking: document.getElementById('person-ranking').value,
             bio: document.getElementById('person-bio').value,
-            avatar: document.getElementById('person-avatar').value
+            avatar: document.getElementById('person-avatar').value,
+            spouse_name: document.getElementById('person-spouse-name').value,
+            spouse_phone: document.getElementById('person-spouse-phone').value,
+            spouse_birth_date: document.getElementById('person-spouse-birth-date').value,
+            spouse_birth_calendar: document.getElementById('person-spouse-birth-calendar').value,
+            spouse_alive: document.getElementById('person-spouse-alive').checked ? 1 : 0,
+            spouse_death_date: document.getElementById('person-spouse-death-date').value,
+            spouse_bio: document.getElementById('person-spouse-bio').value
         };
 
         // 验证必填字段
@@ -680,6 +713,14 @@ class ZupuApp {
         } catch (error) {
             this.showToast('删除失败: ' + error.message);
         }
+    }
+
+    /**
+     * 配偶健在状态改变
+     */
+    onSpouseAliveChanged(checked) {
+        const deathDateGroup = document.getElementById('spouse-death-group');
+        deathDateGroup.style.display = checked ? 'none' : 'block';
     }
 
     /**

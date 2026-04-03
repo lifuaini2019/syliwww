@@ -359,6 +359,46 @@
                             <label>生平简介</label>
                             <textarea id="person-bio" rows="3"></textarea>
                         </div>
+                        
+                        <!-- 配偶信息 -->
+                        <div class="form-group">
+                            <label>配偶姓名</label>
+                            <input type="text" id="person-spouse-name" placeholder="请输入配偶姓名">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>配偶手机</label>
+                                <input type="text" id="person-spouse-phone" placeholder="请输入配偶手机号">
+                            </div>
+                            <div class="form-group">
+                                <label>配偶生日</label>
+                                <input type="date" id="person-spouse-birth-date" min="1736-01-01">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>配偶历法</label>
+                                <select id="person-spouse-birth-calendar">
+                                    <option value="公历">公历</option>
+                                    <option value="农历">农历</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>配偶健在</label>
+                                <div style="display: flex; align-items: center; gap: 10px; height: 40px;">
+                                    <input type="checkbox" id="person-spouse-alive" checked>
+                                    <span>健在</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group" id="spouse-death-group">
+                            <label>配偶去世日期</label>
+                            <input type="date" id="person-spouse-death-date" min="1736-01-01">
+                        </div>
+                        <div class="form-group">
+                            <label>配偶简介</label>
+                            <textarea id="person-spouse-bio" rows="3"></textarea>
+                        </div>
                     </form>
                 </div>
                 <div class="modal-footer">
