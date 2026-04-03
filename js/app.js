@@ -193,6 +193,17 @@ class ZupuApp {
             el.style.display = isAdmin ? 'flex' : 'none';
         });
 
+        // 修改人员管理菜单文字：普通用户显示"我的"，管理员显示"人员管理"
+        const peopleMenuItem = document.querySelector('.menu-item[data-page="people"] span');
+        if (peopleMenuItem) {
+            peopleMenuItem.textContent = isAdmin ? '人员管理' : '我的';
+        }
+        // 同步修改页面标题
+        const peopleSectionTitle = document.querySelector('#people-section h2');
+        if (peopleSectionTitle) {
+            peopleSectionTitle.innerHTML = isAdmin ? '<i class="fas fa-users"></i> 人员管理' : '<i class="fas fa-user"></i> 我的信息';
+        }
+
         // 普通用户只能看到自己的人员信息
         if (!isAdmin) {
             this.loadOwnPersonInfo();
