@@ -502,12 +502,12 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin-bottom: 8px;
+    margin-bottom: 0;
 }
 
 .connection-line-v {
     width: 2px;
-    height: 20px;
+    height: 30px;
     background: #667eea;
 }
 
@@ -522,6 +522,25 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* 向下的连接线 */
+.connection-down {
+    margin-top: 10px;
+}
+
+/* 无儿的人员显示结束标记 */
+.connection-end {
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 5px;
+}
+
+.connection-end .end-mark {
+    font-size: 10px;
+    color: #999;
 }
 
 /* 人员卡片 */
@@ -584,23 +603,10 @@ body {
     gap: 4px;
 }
 
-/* 向下的连接线 */
-.connection-down {
-    margin-top: 15px;
-}
-
-/* 层级连接器 */
-.level-connector {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    margin-top: 15px;
-}
-
-.level-line {
-    width: 60%;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, #667eea, transparent);
+/* 宝塔层级间距 */
+.baota-level {
+    margin-bottom: 0;
+    padding-bottom: 30px;
 }
 
 /* 卡片 */

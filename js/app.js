@@ -811,7 +811,7 @@ class ZupuApp {
     }
 
     /**
-     * 渲染宝塔树 - 带父子关系连接
+     * 渲染宝塔树 - 长辈在上，晚辈在下，引线连续不断（除非无儿）
      */
     renderBaota(people) {
         const canvas = document.getElementById('baota-canvas');
@@ -823,22 +823,33 @@ class ZupuApp {
             peopleDict[p.id] = p;
         });
 
+        // 找出最大世代号
+        let maxShiXi = -Infinity;
+        people.forEach(p => {
+            const gen = parseInt(p.shi_xi) || 0;
+            maxShiXi = Math.max(maxShiXi, gen);
+        });
+
         // 按世系分组并建立父子关系
         const groups = {};
         people.forEach(p => {
             const shiXi = p.shi_xi || '未知';
             if (!groups[shiXi]) groups[shiXi] = [];
             
-            // 查找父亲
-            const father = p.father_id ? peopleDict[p.father_id] : null;
-            
             // 计算子节点数量
             const childrenCount = people.filter(child => child.father_id === p.id).length;
             
+            // 是否有父亲
+            const hasFather = !!p.father_id && !!peopleDict[p.father_id];
+            
+            // 是否是最后一代
+            const isLastGeneration = (parseInt(p.shi_xi) || 0) === maxShiXi;
+            
             groups[shiXi].push({
                 ...p,
-                fatherName: father ? father.name : null,
-                childrenCount: childrenCount
+                hasFather,
+                childrenCount,
+                isLastGeneration
             });
         });
 
@@ -847,12 +858,10 @@ class ZupuApp {
         
         let html = '<div class="baota-tree">';
         
-        // 按世系降序排列（大世代在上）
-        const sortedShiXis = Object.keys(groups).sort((a, b) => parseInt(b) - parseInt(a));
+        // 按世系降序排列（大世代在上，长辈在上）
+        const sortedShiXis = Object.keys(groups).sort((a, b) => parseInt(a) - parseInt(b)); // 升序排列，小世代在上
         
         sortedShiXis.forEach((shiXi, index) => {
-            const isLastLevel = index === sortedShiXis.length - 1;
-            
             html += `
                 <div class="baota-level">
                     <div class="baota-level-title">第${shiXi}世</div>
@@ -865,12 +874,14 @@ class ZupuApp {
                             
                             return `
                             <div class="baota-person-wrapper">
-                                ${p.fatherName ? `
+                                <!-- 向上的连接线（连接到父亲） -->
+                                ${p.hasFather ? `
                                     <div class="connection-up">
                                         <div class="connection-line-v"></div>
-                                        <div class="connection-father">${p.fatherName}</div>
                                     </div>
                                 ` : ''}
+                                
+                                <!-- 人员卡片 -->
                                 <div class="baota-person ${hasChildren ? 'has-children' : ''}" onclick="app.viewPerson(${p.id})">
                                     <img src="${p.avatar || ''}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22><rect width=%2260%22 height=%2260%22 fill=%22%23ddd%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22>${p.name[0]}</text></svg>'">
                                     <div class="person-name">${nameDisplay}</div>
@@ -882,19 +893,23 @@ class ZupuApp {
                                         </div>
                                     ` : ''}
                                 </div>
-                                ${hasChildren && !isLastLevel ? `
+                                
+                                <!-- 向下的连接线（只要有子节点就一直连下去） -->
+                                ${hasChildren ? `
                                     <div class="connection-down">
                                         <div class="connection-line-v"></div>
+                                    </div>
+                                ` : ''}
+                                
+                                <!-- 无儿的人员显示断开标记 -->
+                                ${!hasChildren && !p.isLastGeneration ? `
+                                    <div class="connection-end">
+                                        <span class="end-mark">●</span>
                                     </div>
                                 ` : ''}
                             </div>
                         `}).join('')}
                     </div>
-                    ${!isLastLevel ? `
-                        <div class="level-connector">
-                            <div class="level-line"></div>
-                        </div>
-                    ` : ''}
                 </div>
             `;
         });
