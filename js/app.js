@@ -430,7 +430,9 @@ class ZupuApp {
                         ${isAdmin ? `
                             <button class="btn btn-small btn-primary" onclick="app.editPerson(${person.id})">编辑</button>
                             <button class="btn btn-small btn-danger" onclick="app.deletePerson(${person.id})">删除</button>
-                        ` : ''}
+                        ` : (isSelf ? `
+                            <button class="btn btn-small btn-primary" onclick="app.editPerson(${person.id})">编辑</button>
+                        ` : '')}
                     </td>
                 </tr>
             `;
