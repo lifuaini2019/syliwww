@@ -392,10 +392,11 @@ class ZupuApp {
 
         const isAdmin = this.currentUser?.role === 'admin' || this.currentUser?.role === 'super_admin';
         const currentPersonId = this.currentUser?.person_id;
+        const currentUserPhone = this.currentUser?.username;
 
         tbody.innerHTML = people.map(person => {
             // 普通用户只能看到自己的信息
-            if (!isAdmin && person.id !== currentPersonId) {
+            if (!isAdmin && person.id !== currentPersonId && person.phone !== currentUserPhone) {
                 return '';
             }
 
@@ -404,6 +405,10 @@ class ZupuApp {
             const firstChar = person.name ? person.name[0] : '?';
             const defaultAvatar = `data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><rect width=%2240%22 height=%2240%22 fill=%22%23ddd%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22>${firstChar}</text></svg>`;
             const errorAvatar = `data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><rect width=%2240%22 height=%2240%22 fill=%22%23ddd%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22>?</text></svg>`;
+            
+            // 判断是否是自己
+            const isSelf = person.id === currentPersonId || person.phone === currentUserPhone;
+            const nameDisplay = isSelf ? `${person.name}(我)` : person.name;
 
             return `
                 <tr>
@@ -413,7 +418,7 @@ class ZupuApp {
                              alt="${person.name}" 
                              onerror="this.src='${errorAvatar}'">
                     </td>
-                    <td>${person.name}</td>
+                    <td>${nameDisplay}</td>
                     <td>${person.gender}</td>
                     <td>${person.generation || ''}</td>
                     <td>${person.shi_xi ? '第' + person.shi_xi + '世' : ''}</td>
@@ -422,10 +427,8 @@ class ZupuApp {
                     <td>${fatherName}</td>
                     <td class="actions">
                         <button class="btn btn-small btn-secondary" onclick="app.viewPerson(${person.id})">查看</button>
-                        ${isAdmin || person.id === currentPersonId ? `
-                            <button class="btn btn-small btn-primary" onclick="app.editPerson(${person.id})">编辑</button>
-                        ` : ''}
                         ${isAdmin ? `
+                            <button class="btn btn-small btn-primary" onclick="app.editPerson(${person.id})">编辑</button>
                             <button class="btn btn-small btn-danger" onclick="app.deletePerson(${person.id})">删除</button>
                         ` : ''}
                     </td>
@@ -657,17 +660,23 @@ class ZupuApp {
         people.forEach(p => peopleDict[p.id] = p);
 
         const roots = people.filter(p => !p.father_id);
+        const currentPersonId = this.currentUser?.person_id;
+        const currentUserPhone = this.currentUser?.username;
         
         const buildTreeHTML = (person, level = 0) => {
             const children = people.filter(p => p.father_id == person.id);
             const indent = level * 30;
+            
+            // 判断是否是自己
+            const isSelf = person.id === currentPersonId || person.phone === currentUserPhone;
+            const nameDisplay = isSelf ? `${person.name}(我)` : person.name;
             
             let html = `
                 <div class="tree-node" style="margin-left: ${indent}px; padding: 10px; border-left: 2px solid #4a90d9; margin-bottom: 5px;">
                     <div class="tree-node-content" style="display: flex; align-items: center; gap: 10px; cursor: pointer;" onclick="app.viewPerson(${person.id})">
                         <img src="${person.avatar || ''}" alt="" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;" onerror="this.style.display='none'">
                         <div>
-                            <strong>${person.name}</strong>
+                            <strong>${nameDisplay}</strong>
                             <span style="color: #666; font-size: 12px;">${person.generation || ''} ${person.shi_xi ? '第' + person.shi_xi + '世' : ''}</span>
                         </div>
                     </div>
@@ -740,6 +749,9 @@ class ZupuApp {
             groups[shiXi].push(p);
         });
 
+        const currentPersonId = this.currentUser?.person_id;
+        const currentUserPhone = this.currentUser?.username;
+        
         let html = '';
         const sortedShiXis = Object.keys(groups).sort((a, b) => parseInt(a) - parseInt(b));
         
@@ -750,13 +762,17 @@ class ZupuApp {
                         第${shiXi}世
                     </div>
                     <div class="baota-level-people" style="display: flex; flex-wrap: wrap; gap: 15px; padding-left: 20px;">
-                        ${groups[shiXi].map(p => `
+                        ${groups[shiXi].map(p => {
+                            // 判断是否是自己
+                            const isSelf = p.id === currentPersonId || p.phone === currentUserPhone;
+                            const nameDisplay = isSelf ? `${p.name}(我)` : p.name;
+                            return `
                             <div class="baota-person" style="text-align: center; cursor: pointer;" onclick="app.viewPerson(${p.id})">
                                 <img src="${p.avatar || ''}" alt="" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid #4a90d9;" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22><rect width=%2260%22 height=%2260%22 fill=%22%23ddd%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22>${p.name[0]}</text></svg>'">
-                                <div style="margin-top: 5px; font-size: 14px;">${p.name}</div>
+                                <div style="margin-top: 5px; font-size: 14px;">${nameDisplay}</div>
                                 <div style="font-size: 12px; color: #666;">${p.generation || ''}</div>
                             </div>
-                        `).join('')}
+                        `}).join('')}
                     </div>
                 </div>
             `;
