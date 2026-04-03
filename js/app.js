@@ -26,17 +26,13 @@ class ZupuApp {
      * 绑定事件
      */
     bindEvents() {
-        // 登录按钮事件 - 使用onclick确保可靠性
+        // 登录按钮事件 - 使用addEventListener
         const loginBtn = document.getElementById('login-btn');
-        console.log('登录按钮元素:', loginBtn);
         if (loginBtn) {
-            loginBtn.onclick = (e) => {
-                console.log('登录按钮被点击');
+            loginBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                e.stopPropagation();
                 this.login();
-                return false;
-            };
+            });
         }
         
         // 密码框回车事件
@@ -196,10 +192,8 @@ class ZupuApp {
      * 登录
      */
     async login() {
-        console.log('开始登录流程');
         const username = document.getElementById('login-username').value.trim();
         const password = document.getElementById('login-password').value;
-        console.log('用户名:', username);
 
         if (!username || !password) {
             this.showToast('请输入账号和密码');
@@ -207,9 +201,7 @@ class ZupuApp {
         }
 
         try {
-            console.log('调用API登录');
             const result = await api.login(username, password);
-            console.log('登录结果:', result);
             if (result.status === 'success') {
                 // 后端返回的是 username 和 role，不是 user 对象
                 this.currentUser = {
@@ -896,3 +888,4 @@ class ZupuApp {
 
 // 初始化应用
 const app = new ZupuApp();
+window.app = app;
