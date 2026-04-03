@@ -159,13 +159,32 @@ class ZupuApp {
     /**
      * 更新UI（根据用户角色）
      */
-    updateUI() {
+    async updateUI() {
         if (!this.currentUser) return;
+
+        // 获取用户姓名（如果是普通用户，从人员列表中查找）
+        let displayName = this.currentUser.username;
+        const isAdmin = this.currentUser.role === 'admin' || this.currentUser.role === 'super_admin';
+        
+        if (!isAdmin) {
+            // 普通用户，尝试从人员列表中找到对应的姓名
+            try {
+                const peopleResult = await api.getPeople();
+                if (peopleResult.status === 'success' && peopleResult.data) {
+                    const person = peopleResult.data.find((p) => p.phone === this.currentUser.username);
+                    if (person && person.name) {
+                        displayName = `${this.currentUser.username} ${person.name}`;
+                    }
+                }
+            } catch (e) {
+                console.error('获取用户姓名失败:', e);
+            }
+        }
 
         // 更新用户信息
         const userInfo = document.getElementById('user-info');
         if (userInfo) {
-            userInfo.textContent = `${this.currentUser.username} (${this.getRoleName(this.currentUser.role)})`;
+            userInfo.textContent = `${displayName} (${this.getRoleName(this.currentUser.role)})`;
         }
 
         // 根据角色显示/隐藏菜单
