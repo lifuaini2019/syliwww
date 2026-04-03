@@ -181,10 +181,11 @@ class ZupuApp {
             }
         }
 
-        // 更新用户信息
+        // 更新用户信息（普通用户不显示角色，管理员显示角色）
         const userInfo = document.getElementById('user-info');
         if (userInfo) {
-            userInfo.textContent = `${displayName} (${this.getRoleName(this.currentUser.role)})`;
+            const roleText = isAdmin ? ` (${this.getRoleName(this.currentUser.role)})` : '';
+            userInfo.textContent = `${displayName}${roleText}`;
         }
 
         // 根据角色显示/隐藏菜单
