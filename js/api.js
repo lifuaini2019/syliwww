@@ -4,8 +4,8 @@
  */
 
 const API_CONFIG = {
-    // Cloudflare Workers API 地址
-    baseURL: 'https://zupu-api.your-subdomain.workers.dev',
+    // Cloudflare Workers API 地址 - 与电脑端相同
+    baseURL: 'https://syliwoks.fekepj.com/api',
     
     // 本地开发测试时可以修改
     // baseURL: 'http://localhost:8787'
