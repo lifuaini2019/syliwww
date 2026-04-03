@@ -382,14 +382,17 @@ class ZupuApp {
 
             const father = this.peopleDict[person.father_id];
             const fatherName = father ? father.name : '';
-            
+            const firstChar = person.name ? person.name[0] : '?';
+            const defaultAvatar = `data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><rect width=%2240%22 height=%2240%22 fill=%22%23ddd%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22>${firstChar}</text></svg>`;
+            const errorAvatar = `data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><rect width=%2240%22 height=%2240%22 fill=%22%23ddd%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22>?</text></svg>`;
+
             return `
                 <tr>
                     <td>${person.id}</td>
                     <td class="avatar-cell">
-                        <img src="${person.avatar || 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><rect width=%2240%22 height=%2240%22 fill=%22%23ddd%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22>${person.name ? person.name[0] : '?'}</text></svg>'}" 
+                        <img src="${person.avatar || defaultAvatar}" 
                              alt="${person.name}" 
-                             onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><rect width=%2240%22 height=%2240%22 fill=%22%23ddd%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22>?</text></svg>'">
+                             onerror="this.src='${errorAvatar}'">
                     </td>
                     <td>${person.name}</td>
                     <td>${person.gender}</td>
