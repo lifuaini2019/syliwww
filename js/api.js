@@ -1,12 +1,11 @@
 /**
  * API 接口封装
- * 与电脑端使用相同的接口
+ * 与电脑端使用相同的接�?
  */
 
 const API_CONFIG = {
     // Cloudflare Workers API 地址 - 与电脑端相同
-    // 注意：后端API已经包含 /api 前缀
-    baseURL: 'https://syliwoks.fekepj.com',
+    baseURL: 'https://syliwoks.fekepj.com/api',
     
     // 本地开发测试时可以修改
     // baseURL: 'http://localhost:8787'
@@ -35,7 +34,7 @@ class ZupuAPI {
     }
 
     /**
-     * 获取请求头
+     * 获取请求�?
      */
     getHeaders() {
         const headers = {
@@ -48,7 +47,7 @@ class ZupuAPI {
     }
 
     /**
-     * 发送请求
+     * 发送请�?
      */
     async request(method, endpoint, data = null) {
         const url = `${this.baseURL}${endpoint}`;
@@ -82,7 +81,7 @@ class ZupuAPI {
      * 用户登录
      */
     async login(username, password) {
-        const result = await this.request('POST', '/api/login', { username, password });
+        const result = await this.request('POST', '/login', { username, password });
         if (result.token) {
             this.setToken(result.token);
         }
@@ -93,67 +92,67 @@ class ZupuAPI {
      * 获取当前用户信息
      */
     async getCurrentUser() {
-        return await this.request('GET', '/api/user/me');
+        return await this.request('GET', '/user/me');
     }
 
     // ==================== 人员管理 ====================
 
     /**
-     * 获取所有人员
+     * 获取所有人�?
      */
     async getPeople() {
-        return await this.request('GET', '/api/people');
+        return await this.request('GET', '/people');
     }
 
     /**
      * 获取单个人员
      */
     async getPerson(id) {
-        return await this.request('GET', `/api/people/${id}`);
+        return await this.request('GET', `/people/${id}`);
     }
 
     /**
      * 添加人员
      */
     async addPerson(data) {
-        return await this.request('POST', '/api/people', data);
+        return await this.request('POST', '/people', data);
     }
 
     /**
      * 更新人员
      */
     async updatePerson(id, data) {
-        return await this.request('PUT', `/api/people/${id}`, data);
+        return await this.request('PUT', `/people/${id}`, data);
     }
 
     /**
      * 删除人员
      */
     async deletePerson(id) {
-        return await this.request('DELETE', `/api/people/${id}`);
+        return await this.request('DELETE', `/people/${id}`);
     }
 
     // ==================== 用户管理 ====================
 
     /**
-     * 获取所有用户
+     * 获取所有用�?
      */
     async getUsers() {
-        return await this.request('GET', '/api/users');
+        return await this.request('GET', '/users');
     }
 
     /**
      * 添加用户
      */
     async addUser(data) {
-        return await this.request('POST', '/api/users', data);
+        return await this.request('POST', '/users', data);
     }
 
     /**
      * 删除用户
      */
     async deleteUser(username) {
-        return await this.request('DELETE', `/api/users/${username}`);
+        return await this.request('DELETE', `/users/${username}`);
     }
 
     // ==================== 文件上传 ====================
@@ -166,7 +165,7 @@ class ZupuAPI {
         formData.append('file', file);
         formData.append('type', type);
 
-        const url = `${this.baseURL}/api/upload`;
+        const url = `${this.baseURL}/upload`;
         const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -182,14 +181,14 @@ class ZupuAPI {
      * 获取R2文件列表
      */
     async getR2Files() {
-        return await this.request('GET', '/api/r2-files');
+        return await this.request('GET', '/r2-files');
     }
 
     /**
      * 删除R2文件
      */
     async deleteR2File(key) {
-        return await this.request('DELETE', `/api/r2-files/${encodeURIComponent(key)}`);
+        return await this.request('DELETE', `/r2-files/${encodeURIComponent(key)}`);
     }
 
     // ==================== 统计信息 ====================
@@ -198,7 +197,7 @@ class ZupuAPI {
      * 获取统计数据
      */
     async getStats() {
-        return await this.request('GET', '/api/stats');
+        return await this.request('GET', '/stats');
     }
 
     // ==================== 导入导出 ====================
@@ -207,7 +206,7 @@ class ZupuAPI {
      * 导出数据
      */
     async exportData() {
-        const url = `${this.baseURL}/api/export`;
+        const url = `${this.baseURL}/export`;
         const response = await fetch(url, {
             method: 'GET',
             headers: this.getHeaders()
@@ -237,7 +236,7 @@ class ZupuAPI {
         const formData = new FormData();
         formData.append('file', file);
 
-        const url = `${this.baseURL}/api/import`;
+        const url = `${this.baseURL}/import`;
         const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -255,21 +254,21 @@ class ZupuAPI {
      * 创建备份
      */
     async createBackup() {
-        return await this.request('POST', '/api/backup');
+        return await this.request('POST', '/backup');
     }
 
     /**
      * 获取备份列表
      */
     async getBackups() {
-        return await this.request('GET', '/api/backups');
+        return await this.request('GET', '/backups');
     }
 
     /**
      * 恢复备份
      */
     async restoreBackup(id) {
-        return await this.request('POST', `/api/backup/${id}/restore`);
+        return await this.request('POST', `/backup/${id}/restore`);
     }
 }
 
