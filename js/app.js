@@ -811,49 +811,95 @@ class ZupuApp {
     }
 
     /**
-     * 渲染宝塔树
+     * 渲染宝塔树 - 带父子关系连接
      */
     renderBaota(people) {
         const canvas = document.getElementById('baota-canvas');
         if (!canvas) return;
 
-        // 按世系分组
+        // 创建人员字典
+        const peopleDict = {};
+        people.forEach(p => {
+            peopleDict[p.id] = p;
+        });
+
+        // 按世系分组并建立父子关系
         const groups = {};
         people.forEach(p => {
             const shiXi = p.shi_xi || '未知';
             if (!groups[shiXi]) groups[shiXi] = [];
-            groups[shiXi].push(p);
+            
+            // 查找父亲
+            const father = p.father_id ? peopleDict[p.father_id] : null;
+            
+            // 计算子节点数量
+            const childrenCount = people.filter(child => child.father_id === p.id).length;
+            
+            groups[shiXi].push({
+                ...p,
+                fatherName: father ? father.name : null,
+                childrenCount: childrenCount
+            });
         });
 
         const currentPersonId = this.currentUser?.person_id;
         const currentUserPhone = this.currentUser?.username;
         
-        let html = '';
-        const sortedShiXis = Object.keys(groups).sort((a, b) => parseInt(a) - parseInt(b));
+        let html = '<div class="baota-tree">';
         
-        sortedShiXis.forEach(shiXi => {
+        // 按世系降序排列（大世代在上）
+        const sortedShiXis = Object.keys(groups).sort((a, b) => parseInt(b) - parseInt(a));
+        
+        sortedShiXis.forEach((shiXi, index) => {
+            const isLastLevel = index === sortedShiXis.length - 1;
+            
             html += `
-                <div class="baota-level" style="margin-bottom: 30px;">
-                    <div class="baota-level-title" style="background: #4a90d9; color: white; padding: 8px 15px; border-radius: 20px; display: inline-block; margin-bottom: 15px; font-weight: bold;">
-                        第${shiXi}世
-                    </div>
-                    <div class="baota-level-people" style="display: flex; flex-wrap: wrap; gap: 15px; padding-left: 20px;">
+                <div class="baota-level">
+                    <div class="baota-level-title">第${shiXi}世</div>
+                    <div class="baota-level-people">
                         ${groups[shiXi].map(p => {
                             // 判断是否是自己
                             const isSelf = p.id === currentPersonId || p.phone === currentUserPhone;
                             const nameDisplay = isSelf ? `${p.name}(我)` : p.name;
+                            const hasChildren = p.childrenCount > 0;
+                            
                             return `
-                            <div class="baota-person" style="text-align: center; cursor: pointer;" onclick="app.viewPerson(${p.id})">
-                                <img src="${p.avatar || ''}" alt="" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid #4a90d9;" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22><rect width=%2260%22 height=%2260%22 fill=%22%23ddd%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22>${p.name[0]}</text></svg>'">
-                                <div style="margin-top: 5px; font-size: 14px;">${nameDisplay}</div>
-                                <div style="font-size: 12px; color: #666;">${p.generation || ''}</div>
+                            <div class="baota-person-wrapper">
+                                ${p.fatherName ? `
+                                    <div class="connection-up">
+                                        <div class="connection-line-v"></div>
+                                        <div class="connection-father">${p.fatherName}</div>
+                                    </div>
+                                ` : ''}
+                                <div class="baota-person ${hasChildren ? 'has-children' : ''}" onclick="app.viewPerson(${p.id})">
+                                    <img src="${p.avatar || ''}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22><rect width=%2260%22 height=%2260%22 fill=%22%23ddd%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22>${p.name[0]}</text></svg>'">
+                                    <div class="person-name">${nameDisplay}</div>
+                                    <div class="person-generation">${p.generation || ''}</div>
+                                    ${hasChildren ? `
+                                        <div class="children-badge">
+                                            <span>${p.childrenCount}</span>
+                                            <span>▼</span>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                                ${hasChildren && !isLastLevel ? `
+                                    <div class="connection-down">
+                                        <div class="connection-line-v"></div>
+                                    </div>
+                                ` : ''}
                             </div>
                         `}).join('')}
                     </div>
+                    ${!isLastLevel ? `
+                        <div class="level-connector">
+                            <div class="level-line"></div>
+                        </div>
+                    ` : ''}
                 </div>
             `;
         });
-
+        
+        html += '</div>';
         canvas.innerHTML = html || '<p style="text-align: center; color: #999;">暂无数据</p>';
     }
 

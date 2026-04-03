@@ -458,6 +458,151 @@ body {
     padding: 20px;
 }
 
+/* 宝塔树样式 - 带父子关系连接 */
+.baota-tree {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+}
+
+.baota-level {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+.baota-level-title {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.baota-level-people {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 30px;
+    width: 100%;
+}
+
+.baota-person-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* 向上的连接线 */
+.connection-up {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.connection-line-v {
+    width: 2px;
+    height: 20px;
+    background: #667eea;
+}
+
+.connection-father {
+    font-size: 12px;
+    color: #667eea;
+    background: rgba(102, 126, 234, 0.1);
+    padding: 2px 10px;
+    border-radius: 10px;
+    margin-top: 4px;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 人员卡片 */
+.baota-person {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    width: 100px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.baota-person:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+}
+
+.baota-person.has-children {
+    border: 2px solid #667eea;
+}
+
+.baota-person img {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #f0f0f0;
+    margin-bottom: 8px;
+}
+
+.baota-person .person-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    text-align: center;
+    margin-bottom: 2px;
+}
+
+.baota-person .person-generation {
+    font-size: 12px;
+    color: #999;
+}
+
+/* 子节点徽章 */
+.children-badge {
+    position: absolute;
+    bottom: -10px;
+    background: #667eea;
+    color: white;
+    border-radius: 15px;
+    padding: 2px 10px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* 向下的连接线 */
+.connection-down {
+    margin-top: 15px;
+}
+
+/* 层级连接器 */
+.level-connector {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 15px;
+}
+
+.level-line {
+    width: 60%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #667eea, transparent);
+}
+
 /* 卡片 */
 .card {
     background: var(--card-bg);
