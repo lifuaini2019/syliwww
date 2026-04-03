@@ -188,8 +188,6 @@ class ZupuApp {
         }
 
         // 根据角色显示/隐藏菜单
-        const isAdmin = this.currentUser.role === 'admin' || this.currentUser.role === 'super_admin';
-        
         document.querySelectorAll('.admin-only').forEach(el => {
             el.style.display = isAdmin ? 'flex' : 'none';
         });
