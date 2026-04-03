@@ -75,6 +75,11 @@ class ZupuApp {
             this.loadPeople();
         });
 
+        // 添加人员按钮
+        document.getElementById('add-person-btn')?.addEventListener('click', () => {
+            this.openAddPersonModal();
+        });
+
         // 世系图缩放
         document.getElementById('tree-zoom-in')?.addEventListener('click', () => this.zoomTree(10));
         document.getElementById('tree-zoom-out')?.addEventListener('click', () => this.zoomTree(-10));
@@ -493,6 +498,51 @@ class ZupuApp {
     }
 
     /**
+     * 打开添加人员弹窗
+     */
+    openAddPersonModal() {
+        const modal = document.getElementById('person-modal');
+        const title = document.getElementById('person-modal-title');
+        
+        title.textContent = '添加人员';
+        
+        // 清空表单
+        document.getElementById('person-id').value = '';
+        document.getElementById('person-name').value = '';
+        document.getElementById('person-gender').value = '男';
+        document.getElementById('person-generation').value = '';
+        document.getElementById('person-shi-xi').value = '';
+        document.getElementById('person-birth-date').value = '';
+        document.getElementById('person-birth-calendar').value = '公历';
+        document.getElementById('person-ranking').value = '';
+        document.getElementById('person-bio').value = '';
+        document.getElementById('person-avatar').value = '';
+        
+        // 头像预览重置
+        const avatarPreview = document.getElementById('person-avatar-preview');
+        avatarPreview.src = '';
+        avatarPreview.onerror = function() {
+            this.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="%23ddd"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999">?</text></svg>';
+        };
+
+        // 填充父亲选择框
+        this.fillFatherSelect(null);
+
+        // 启用表单
+        const form = document.getElementById('person-form');
+        const inputs = form.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => {
+            input.disabled = false;
+        });
+
+        // 显示保存按钮和选择头像按钮
+        document.getElementById('save-person-btn').style.display = 'inline-flex';
+        document.getElementById('select-avatar-btn').style.display = 'inline-flex';
+
+        modal.classList.remove('hidden');
+    }
+
+    /**
      * 编辑人员
      */
     editPerson(id) {
@@ -568,7 +618,7 @@ class ZupuApp {
     }
 
     /**
-     * 保存人员
+     * 保存人员（新增或编辑）
      */
     async savePerson() {
         const id = document.getElementById('person-id').value;
@@ -585,17 +635,31 @@ class ZupuApp {
             avatar: document.getElementById('person-avatar').value
         };
 
+        // 验证必填字段
+        if (!data.name) {
+            this.showToast('请输入姓名');
+            return;
+        }
+
         try {
-            const result = await api.updatePerson(id, data);
+            let result;
+            if (id) {
+                // 编辑现有人员
+                result = await api.updatePerson(id, data);
+            } else {
+                // 添加新人员
+                result = await api.addPerson(data);
+            }
+            
             if (result.status === 'success') {
-                this.showToast('保存成功');
+                this.showToast(id ? '保存成功' : '添加成功');
                 document.getElementById('person-modal').classList.add('hidden');
                 this.loadPeople();
             } else {
-                this.showToast(result.message || '保存失败');
+                this.showToast(result.message || (id ? '保存失败' : '添加失败'));
             }
         } catch (error) {
-            this.showToast('保存失败: ' + error.message);
+            this.showToast((id ? '保存' : '添加') + '失败: ' + error.message);
         }
     }
 
