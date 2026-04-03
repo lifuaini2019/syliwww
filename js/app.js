@@ -99,24 +99,27 @@ class ZupuApp {
      */
     async checkLogin() {
         const token = localStorage.getItem('token');
+        const userInfo = localStorage.getItem('userInfo');
+        
         if (!token) {
             this.showLoginPage();
             return;
         }
 
-        try {
-            api.setToken(token);
-            const result = await api.getCurrentUser();
-            if (result.status === 'success') {
-                this.currentUser = result.data;
+        // 从本地存储恢复用户信息
+        if (userInfo) {
+            try {
+                this.currentUser = JSON.parse(userInfo);
+                api.setToken(token);
                 this.showMainPage();
                 this.updateUI();
-            } else {
-                this.showLoginPage();
+                return;
+            } catch (e) {
+                console.error('解析用户信息失败:', e);
             }
-        } catch (error) {
-            this.showLoginPage();
         }
+        
+        this.showLoginPage();
     }
 
     /**
@@ -189,7 +192,14 @@ class ZupuApp {
         try {
             const result = await api.login(username, password);
             if (result.status === 'success') {
-                this.currentUser = result.user;
+                // 后端返回的是 username 和 role，不是 user 对象
+                this.currentUser = {
+                    username: result.username,
+                    role: result.role,
+                    token: result.token
+                };
+                // 保存用户信息到本地存储
+                localStorage.setItem('userInfo', JSON.stringify(this.currentUser));
                 this.showMainPage();
                 this.updateUI();
                 this.showToast('登录成功');
@@ -207,6 +217,7 @@ class ZupuApp {
     logout() {
         api.clearToken();
         this.currentUser = null;
+        localStorage.removeItem('userInfo');
         this.showLoginPage();
         this.showToast('已退出登录');
     }
