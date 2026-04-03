@@ -173,7 +173,7 @@ class ZupuApp {
                 if (peopleResult.status === 'success' && peopleResult.data) {
                     const person = peopleResult.data.find((p) => p.phone === this.currentUser.username);
                     if (person && person.name) {
-                        displayName = `${this.currentUser.username} ${person.name}`;
+                        displayName = `(${person.name})兄弟`;
                     }
                 }
             } catch (e) {
