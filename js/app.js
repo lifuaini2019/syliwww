@@ -26,11 +26,24 @@ class ZupuApp {
      * 绑定事件
      */
     bindEvents() {
-        // 登录
-        document.getElementById('login-btn')?.addEventListener('click', () => this.login());
-        document.getElementById('login-password')?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.login();
-        });
+        // 登录按钮事件 - 使用onclick确保可靠性
+        const loginBtn = document.getElementById('login-btn');
+        if (loginBtn) {
+            loginBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.login();
+                return false;
+            };
+        }
+        
+        // 密码框回车事件
+        const passwordInput = document.getElementById('login-password');
+        if (passwordInput) {
+            passwordInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') this.login();
+            });
+        }
 
         // 退出
         document.getElementById('logout-btn')?.addEventListener('click', () => this.logout());
