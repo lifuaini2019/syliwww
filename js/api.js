@@ -5,7 +5,8 @@
 
 const API_CONFIG = {
     // Cloudflare Workers API 地址 - 与电脑端相同
-    baseURL: 'https://syliwoks.fekepj.com/api',
+    // 注意：后端API已经包含 /api 前缀
+    baseURL: 'https://syliwoks.fekepj.com',
     
     // 本地开发测试时可以修改
     // baseURL: 'http://localhost:8787'
