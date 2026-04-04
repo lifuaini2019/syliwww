@@ -136,6 +136,11 @@ class ZupuApp {
         // 选择头像
         document.getElementById('select-avatar-btn')?.addEventListener('click', () => this.selectAvatar());
 
+        // 本人健在复选框事件
+        document.getElementById('person-alive')?.addEventListener('change', (e) => {
+            this.onAliveChanged(e.target.checked);
+        });
+
         // 配偶健在复选框事件
         document.getElementById('person-spouse-alive')?.addEventListener('change', (e) => {
             this.onSpouseAliveChanged(e.target.checked);
@@ -586,6 +591,11 @@ class ZupuApp {
         document.getElementById('person-name').value = '';
         document.getElementById('person-alias').value = '';
         document.getElementById('person-gender').value = '男';
+        document.getElementById('person-phone').value = '';
+        document.getElementById('person-alive').checked = true;
+        document.getElementById('person-married').checked = true;
+        document.getElementById('person-adopted').checked = false;
+        document.getElementById('person-death-date').value = '';
         document.getElementById('person-generation').value = '';
         document.getElementById('person-shi-xi').value = '';
         document.getElementById('person-birth-date').value = '';
@@ -657,6 +667,11 @@ class ZupuApp {
         document.getElementById('person-name').value = person.name || '';
         document.getElementById('person-alias').value = person.alias || '';
         document.getElementById('person-gender').value = person.gender || '男';
+        document.getElementById('person-phone').value = person.phone || '';
+        document.getElementById('person-alive').checked = person.death_date ? false : (person.alive !== undefined ? person.alive : true);
+        document.getElementById('person-married').checked = person.is_married !== undefined ? person.is_married : true;
+        document.getElementById('person-adopted').checked = person.is_adopted !== undefined ? person.is_adopted : false;
+        document.getElementById('person-death-date').value = person.death_date || '';
         document.getElementById('person-generation').value = person.generation || '';
         document.getElementById('person-shi-xi').value = person.shi_xi || '';
         document.getElementById('person-birth-date').value = person.birth_date || '';
@@ -730,10 +745,16 @@ class ZupuApp {
      */
     async savePerson() {
         const id = document.getElementById('person-id').value;
+        const isAlive = document.getElementById('person-alive').checked;
         const data = {
             name: document.getElementById('person-name').value,
             alias: document.getElementById('person-alias').value,
+            phone: document.getElementById('person-phone').value,
             gender: document.getElementById('person-gender').value,
+            is_alive: isAlive ? 1 : 0,
+            death_date: isAlive ? '' : document.getElementById('person-death-date').value,
+            is_married: document.getElementById('person-married').checked ? 1 : 0,
+            is_adopted: document.getElementById('person-adopted').checked ? 1 : 0,
             generation: document.getElementById('person-generation').value,
             shi_xi: document.getElementById('person-shi-xi').value,
             birth_date: document.getElementById('person-birth-date').value,
@@ -800,6 +821,23 @@ class ZupuApp {
             }
         } catch (error) {
             this.showToast('删除失败: ' + error.message);
+        }
+    }
+
+    /**
+     * 本人健在状态改变
+     */
+    onAliveChanged(checked) {
+        const deathDateInput = document.getElementById('person-death-date');
+        if (deathDateInput) {
+            const formGroup = deathDateInput.closest('.form-group');
+            if (formGroup) {
+                formGroup.style.display = checked ? 'block' : 'block';
+            }
+            deathDateInput.disabled = checked;
+            if (checked) {
+                deathDateInput.value = '';
+            }
         }
     }
 
