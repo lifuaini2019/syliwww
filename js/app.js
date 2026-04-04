@@ -668,7 +668,7 @@ class ZupuApp {
         document.getElementById('person-alias').value = person.alias || '';
         document.getElementById('person-gender').value = person.gender || '男';
         document.getElementById('person-phone').value = person.phone || '';
-        document.getElementById('person-alive').checked = person.death_date ? false : (person.alive !== undefined ? person.alive : true);
+        document.getElementById('person-alive').checked = person.death_date ? false : (person.is_alive !== undefined ? person.is_alive : true);
         document.getElementById('person-married').checked = person.is_married !== undefined ? person.is_married : true;
         document.getElementById('person-adopted').checked = person.is_adopted !== undefined ? person.is_adopted : false;
         document.getElementById('person-death-date').value = person.death_date || '';
