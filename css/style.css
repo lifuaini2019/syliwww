@@ -456,8 +456,8 @@ body {
 #baota-canvas {
     min-width: 100%;
     min-height: 100%;
-    padding: 20px;
-    padding-bottom: 20px;
+    padding: 10px;
+    padding-bottom: 10px;
     transform-origin: top left;
 }
 
