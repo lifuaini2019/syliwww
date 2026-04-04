@@ -9,7 +9,14 @@ class ZupuApp {
         this.currentPage = 'overview';
         this.peopleData = [];
         this.peopleDict = {};
-        this.zoomLevel = 100;
+        this.treeZoomLevel = 100;
+        this.baotaZoomLevel = 100;
+        
+        this.treePinchState = { active: false, initialDistance: 0, initialZoom: 100 };
+        this.baotaPinchState = { active: false, initialDistance: 0, initialZoom: 100 };
+        
+        this.treeDragState = { active: false, startX: 0, startY: 0, translateX: 0, translateY: 0 };
+        this.baotaDragState = { active: false, startX: 0, startY: 0, translateX: 0, translateY: 0 };
         
         this.init();
     }
@@ -38,6 +45,16 @@ class ZupuApp {
             loginBtn.onclick = (e) => {
                 e.preventDefault();
                 this.login();
+                return false;
+            };
+        }
+
+        // 游客预览按钮事件
+        const guestBtn = document.getElementById('guest-btn');
+        if (guestBtn) {
+            guestBtn.onclick = (e) => {
+                e.preventDefault();
+                this.guestLogin();
                 return false;
             };
         }
@@ -89,6 +106,22 @@ class ZupuApp {
         document.getElementById('baota-zoom-in')?.addEventListener('click', () => this.zoomBaota(10));
         document.getElementById('baota-zoom-out')?.addEventListener('click', () => this.zoomBaota(-10));
         document.getElementById('baota-reset')?.addEventListener('click', () => this.resetBaotaZoom());
+
+        // 世系图双指缩放
+        const treeContainer = document.getElementById('tree-container');
+        if (treeContainer) {
+            treeContainer.addEventListener('touchstart', (e) => this.handleTreeTouchStart(e), { passive: false });
+            treeContainer.addEventListener('touchmove', (e) => this.handleTreeTouchMove(e), { passive: false });
+            treeContainer.addEventListener('touchend', () => this.handleTreeTouchEnd());
+        }
+
+        // 宝塔树双指缩放
+        const baotaContainer = document.getElementById('baota-container');
+        if (baotaContainer) {
+            baotaContainer.addEventListener('touchstart', (e) => this.handleBaotaTouchStart(e), { passive: false });
+            baotaContainer.addEventListener('touchmove', (e) => this.handleBaotaTouchMove(e), { passive: false });
+            baotaContainer.addEventListener('touchend', () => this.handleBaotaTouchEnd());
+        }
 
         // 弹窗关闭
         document.querySelectorAll('.modal-close').forEach(btn => {
@@ -164,6 +197,11 @@ class ZupuApp {
     showMainPage() {
         document.getElementById('login-page').classList.add('hidden');
         document.getElementById('main-page').classList.remove('hidden');
+        
+        const treeZoomControls = document.getElementById('tree-zoom-controls');
+        const baotaZoomControls = document.getElementById('baota-zoom-controls');
+        if (treeZoomControls) treeZoomControls.style.display = 'none';
+        if (baotaZoomControls) baotaZoomControls.style.display = 'none';
     }
 
     /**
@@ -172,11 +210,12 @@ class ZupuApp {
     async updateUI() {
         if (!this.currentUser) return;
 
-        // 获取用户姓名（如果是普通用户，从人员列表中查找）
+        // 检查是否是游客
+        const isGuest = this.currentUser.role === 'guest';
         let displayName = this.currentUser.username;
         const isAdmin = this.currentUser.role === 'admin' || this.currentUser.role === 'super_admin';
         
-        if (!isAdmin) {
+        if (!isAdmin && !isGuest) {
             // 普通用户，尝试从人员列表中找到对应的姓名
             try {
                 const peopleResult = await api.getPeople();
@@ -194,7 +233,7 @@ class ZupuApp {
         // 更新用户信息（普通用户不显示角色，管理员显示角色）
         const userInfo = document.getElementById('user-info');
         if (userInfo) {
-            const roleText = isAdmin ? ` (${this.getRoleName(this.currentUser.role)})` : '';
+            const roleText = isGuest ? ' (游客)' : (isAdmin ? ` (${this.getRoleName(this.currentUser.role)})` : '');
             userInfo.textContent = `${displayName}${roleText}`;
         }
 
@@ -203,19 +242,27 @@ class ZupuApp {
             el.style.display = isAdmin ? 'flex' : 'none';
         });
 
-        // 修改人员管理菜单文字：普通用户显示"我的"，管理员显示"人员管理"
+        // 修改人员管理菜单文字：普通用户显示"我的"，管理员显示"人员管理"，游客显示"成员列表"
         const peopleMenuItem = document.querySelector('.menu-item[data-page="people"] span');
         if (peopleMenuItem) {
-            peopleMenuItem.textContent = isAdmin ? '人员管理' : '我的';
+            if (isGuest) {
+                peopleMenuItem.textContent = '成员列表';
+            } else {
+                peopleMenuItem.textContent = isAdmin ? '人员管理' : '我的';
+            }
         }
         // 同步修改页面标题
         const peopleSectionTitle = document.querySelector('#people-section h2');
         if (peopleSectionTitle) {
-            peopleSectionTitle.innerHTML = isAdmin ? '<i class="fas fa-users"></i> 人员管理' : '<i class="fas fa-user"></i> 我的信息';
+            if (isGuest) {
+                peopleSectionTitle.innerHTML = '<i class="fas fa-users"></i> 成员列表';
+            } else {
+                peopleSectionTitle.innerHTML = isAdmin ? '<i class="fas fa-users"></i> 人员管理' : '<i class="fas fa-user"></i> 我的信息';
+            }
         }
 
-        // 普通用户只能看到自己的人员信息
-        if (!isAdmin) {
+        // 普通用户只能看到自己的人员信息，游客可以看所有
+        if (!isAdmin && !isGuest) {
             this.loadOwnPersonInfo();
         } else {
             this.loadOverview();
@@ -266,6 +313,22 @@ class ZupuApp {
         } catch (error) {
             this.showToast('登录失败: ' + error.message);
         }
+    }
+
+    /**
+     * 游客登录
+     */
+    guestLogin() {
+        this.currentUser = {
+            username: '游客',
+            role: 'guest',
+            token: null
+        };
+        // 保存用户信息到本地存储
+        localStorage.setItem('userInfo', JSON.stringify(this.currentUser));
+        this.showMainPage();
+        this.updateUI();
+        this.showToast('游客模式已开启');
     }
 
     /**
@@ -322,6 +385,13 @@ class ZupuApp {
         if (targetSection) {
             targetSection.classList.add('active');
         }
+
+        // 显示/隐藏缩放按钮
+        const treeZoomControls = document.getElementById('tree-zoom-controls');
+        const baotaZoomControls = document.getElementById('baota-zoom-controls');
+        
+        if (treeZoomControls) treeZoomControls.style.display = page === 'tree' ? 'flex' : 'none';
+        if (baotaZoomControls) baotaZoomControls.style.display = page === 'baota' ? 'flex' : 'none';
 
         // 关闭侧边栏（移动端）
         this.closeSidebar();
@@ -514,12 +584,18 @@ class ZupuApp {
         // 清空表单
         document.getElementById('person-id').value = '';
         document.getElementById('person-name').value = '';
+        document.getElementById('person-alias').value = '';
         document.getElementById('person-gender').value = '男';
         document.getElementById('person-generation').value = '';
         document.getElementById('person-shi-xi').value = '';
         document.getElementById('person-birth-date').value = '';
         document.getElementById('person-birth-calendar').value = '公历';
         document.getElementById('person-ranking').value = '';
+        document.getElementById('person-birth-place').value = '';
+        document.getElementById('person-live-place').value = '';
+        document.getElementById('person-move-info').value = '';
+        document.getElementById('person-remark').value = '';
+        document.getElementById('person-sort').value = '';
         document.getElementById('person-bio').value = '';
         document.getElementById('person-avatar').value = '';
         
@@ -579,12 +655,18 @@ class ZupuApp {
         // 填充表单
         document.getElementById('person-id').value = person.id || '';
         document.getElementById('person-name').value = person.name || '';
+        document.getElementById('person-alias').value = person.alias || '';
         document.getElementById('person-gender').value = person.gender || '男';
         document.getElementById('person-generation').value = person.generation || '';
         document.getElementById('person-shi-xi').value = person.shi_xi || '';
         document.getElementById('person-birth-date').value = person.birth_date || '';
         document.getElementById('person-birth-calendar').value = person.birth_calendar || '公历';
         document.getElementById('person-ranking').value = person.ranking || '';
+        document.getElementById('person-birth-place').value = person.birth_place || '';
+        document.getElementById('person-live-place').value = person.live_place || '';
+        document.getElementById('person-move-info').value = person.move_info || '';
+        document.getElementById('person-remark').value = person.remark || '';
+        document.getElementById('person-sort').value = person.sort || '';
         document.getElementById('person-bio').value = person.bio || '';
         document.getElementById('person-avatar').value = person.avatar || '';
         
@@ -650,6 +732,7 @@ class ZupuApp {
         const id = document.getElementById('person-id').value;
         const data = {
             name: document.getElementById('person-name').value,
+            alias: document.getElementById('person-alias').value,
             gender: document.getElementById('person-gender').value,
             generation: document.getElementById('person-generation').value,
             shi_xi: document.getElementById('person-shi-xi').value,
@@ -657,6 +740,11 @@ class ZupuApp {
             birth_calendar: document.getElementById('person-birth-calendar').value,
             father_id: document.getElementById('person-father').value || null,
             ranking: document.getElementById('person-ranking').value,
+            birth_place: document.getElementById('person-birth-place').value,
+            live_place: document.getElementById('person-live-place').value,
+            move_info: document.getElementById('person-move-info').value,
+            remark: document.getElementById('person-remark').value,
+            sort: document.getElementById('person-sort').value,
             bio: document.getElementById('person-bio').value,
             avatar: document.getElementById('person-avatar').value,
             spouse_name: document.getElementById('person-spouse-name').value,
@@ -819,22 +907,74 @@ class ZupuApp {
      * 世系图缩放
      */
     zoomTree(delta) {
-        this.zoomLevel = Math.max(50, Math.min(200, this.zoomLevel + delta));
-        document.getElementById('tree-zoom-level').textContent = this.zoomLevel + '%';
+        this.treeZoomLevel = Math.max(50, Math.min(300, this.treeZoomLevel + delta));
         const canvas = document.getElementById('tree-canvas');
         if (canvas) {
-            canvas.style.transform = `scale(${this.zoomLevel / 100})`;
-            canvas.style.transformOrigin = 'top left';
+            canvas.style.transform = `translate(${this.treeDragState.translateX}px, ${this.treeDragState.translateY}px) scale(${this.treeZoomLevel / 100})`;
         }
     }
 
     resetTreeZoom() {
-        this.zoomLevel = 100;
-        document.getElementById('tree-zoom-level').textContent = '100%';
+        this.treeZoomLevel = 100;
+        this.treeDragState.translateX = 0;
+        this.treeDragState.translateY = 0;
         const canvas = document.getElementById('tree-canvas');
         if (canvas) {
             canvas.style.transform = 'scale(1)';
         }
+    }
+
+    /**
+     * 世系图双指触摸事件
+     */
+    getTouchDistance(touches) {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    handleTreeTouchStart(e) {
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            this.treePinchState.active = true;
+            this.treePinchState.initialDistance = this.getTouchDistance(e.touches);
+            this.treePinchState.initialZoom = this.treeZoomLevel;
+        } else if (e.touches.length === 1) {
+            this.treeDragState.active = true;
+            this.treeDragState.startX = e.touches[0].clientX;
+            this.treeDragState.startY = e.touches[0].clientY;
+        }
+    }
+
+    handleTreeTouchMove(e) {
+        if (this.treePinchState.active && e.touches.length === 2) {
+            e.preventDefault();
+            const currentDistance = this.getTouchDistance(e.touches);
+            const scale = currentDistance / this.treePinchState.initialDistance;
+            const newZoom = this.treePinchState.initialZoom * scale;
+            this.treeZoomLevel = Math.max(50, Math.min(300, newZoom));
+            const canvas = document.getElementById('tree-canvas');
+            if (canvas) {
+                canvas.style.transform = `translate(${this.treeDragState.translateX}px, ${this.treeDragState.translateY}px) scale(${this.treeZoomLevel / 100})`;
+            }
+        } else if (this.treeDragState.active && e.touches.length === 1) {
+            e.preventDefault();
+            const dx = e.touches[0].clientX - this.treeDragState.startX;
+            const dy = e.touches[0].clientY - this.treeDragState.startY;
+            this.treeDragState.translateX += dx;
+            this.treeDragState.translateY += dy;
+            this.treeDragState.startX = e.touches[0].clientX;
+            this.treeDragState.startY = e.touches[0].clientY;
+            const canvas = document.getElementById('tree-canvas');
+            if (canvas) {
+                canvas.style.transform = `translate(${this.treeDragState.translateX}px, ${this.treeDragState.translateY}px) scale(${this.treeZoomLevel / 100})`;
+            }
+        }
+    }
+
+    handleTreeTouchEnd() {
+        this.treePinchState.active = false;
+        this.treeDragState.active = false;
     }
 
     /**
@@ -963,22 +1103,68 @@ class ZupuApp {
      * 宝塔树缩放
      */
     zoomBaota(delta) {
-        this.zoomLevel = Math.max(50, Math.min(200, this.zoomLevel + delta));
-        document.getElementById('baota-zoom-level').textContent = this.zoomLevel + '%';
+        this.baotaZoomLevel = Math.max(50, Math.min(300, this.baotaZoomLevel + delta));
         const canvas = document.getElementById('baota-canvas');
         if (canvas) {
-            canvas.style.transform = `scale(${this.zoomLevel / 100})`;
-            canvas.style.transformOrigin = 'top left';
+            canvas.style.transform = `translate(${this.baotaDragState.translateX}px, ${this.baotaDragState.translateY}px) scale(${this.baotaZoomLevel / 100})`;
         }
     }
 
     resetBaotaZoom() {
-        this.zoomLevel = 100;
-        document.getElementById('baota-zoom-level').textContent = '100%';
+        this.baotaZoomLevel = 100;
+        this.baotaDragState.translateX = 0;
+        this.baotaDragState.translateY = 0;
         const canvas = document.getElementById('baota-canvas');
         if (canvas) {
             canvas.style.transform = 'scale(1)';
         }
+    }
+
+    /**
+     * 宝塔树双指触摸事件
+     */
+    handleBaotaTouchStart(e) {
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            this.baotaPinchState.active = true;
+            this.baotaPinchState.initialDistance = this.getTouchDistance(e.touches);
+            this.baotaPinchState.initialZoom = this.baotaZoomLevel;
+        } else if (e.touches.length === 1) {
+            this.baotaDragState.active = true;
+            this.baotaDragState.startX = e.touches[0].clientX;
+            this.baotaDragState.startY = e.touches[0].clientY;
+        }
+    }
+
+    handleBaotaTouchMove(e) {
+        if (this.baotaPinchState.active && e.touches.length === 2) {
+            e.preventDefault();
+            const currentDistance = this.getTouchDistance(e.touches);
+            const scale = currentDistance / this.baotaPinchState.initialDistance;
+            const newZoom = this.baotaPinchState.initialZoom * scale;
+            this.baotaZoomLevel = Math.max(50, Math.min(300, newZoom));
+            const canvas = document.getElementById('baota-canvas');
+            if (canvas) {
+                canvas.style.transform = `translate(${this.baotaDragState.translateX}px, ${this.baotaDragState.translateY}px) scale(${this.baotaZoomLevel / 100})`;
+            }
+        } else if (this.baotaDragState.active && e.touches.length === 1) {
+            e.preventDefault();
+            const dx = e.touches[0].clientX - this.baotaDragState.startX;
+            const dy = e.touches[0].clientY - this.baotaDragState.startY;
+            this.baotaDragState.translateX += dx;
+            this.baotaDragState.translateY += dy;
+            this.baotaDragState.startX = e.touches[0].clientX;
+            this.baotaDragState.startY = e.touches[0].clientY;
+            const canvas = document.getElementById('baota-canvas');
+            if (canvas) {
+                canvas.style.transform = `translate(${this.baotaDragState.translateX}px, ${this.baotaDragState.translateY}px) scale(${this.baotaZoomLevel / 100})`;
+            }
+        }
+    }
+
+    handleBaotaTouchEnd() {
+        this.baotaPinchState.active = false;
+        this.baotaDragState.active = false;
     }
 
     /**

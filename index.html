@@ -28,6 +28,9 @@
                     <button id="login-btn" class="btn btn-primary">
                         <i class="fas fa-sign-in-alt"></i> 登录
                     </button>
+                    <button id="guest-btn" class="btn" style="margin-top: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; width: 100%; padding: 12px; font-size: 16px;">
+                        <i class="fas fa-eye"></i> 游客预览
+                    </button>
                 </div>
             </div>
         </div>
@@ -176,15 +179,14 @@
                 <section id="tree-section" class="content-section">
                     <div class="section-header">
                         <h2><i class="fas fa-sitemap"></i> 世系图</h2>
-                        <div class="section-actions">
-                            <button id="tree-zoom-out" class="btn btn-small"><i class="fas fa-minus"></i></button>
-                            <span id="tree-zoom-level">100%</span>
-                            <button id="tree-zoom-in" class="btn btn-small"><i class="fas fa-plus"></i></button>
-                            <button id="tree-reset" class="btn btn-secondary">重置</button>
-                        </div>
                     </div>
                     <div id="tree-container" class="tree-container">
                         <div id="tree-canvas"></div>
+                    </div>
+                    <div class="zoom-controls" id="tree-zoom-controls">
+                        <button id="tree-zoom-in" class="zoom-btn"><i class="fas fa-plus"></i></button>
+                        <button id="tree-zoom-out" class="zoom-btn"><i class="fas fa-minus"></i></button>
+                        <button id="tree-reset" class="zoom-btn"><i class="fas fa-sync-alt"></i></button>
                     </div>
                 </section>
 
@@ -192,15 +194,14 @@
                 <section id="baota-section" class="content-section">
                     <div class="section-header">
                         <h2><i class="fas fa-tree"></i> 宝塔树形体</h2>
-                        <div class="section-actions">
-                            <button id="baota-zoom-out" class="btn btn-small"><i class="fas fa-minus"></i></button>
-                            <span id="baota-zoom-level">100%</span>
-                            <button id="baota-zoom-in" class="btn btn-small"><i class="fas fa-plus"></i></button>
-                            <button id="baota-reset" class="btn btn-secondary">重置</button>
-                        </div>
                     </div>
                     <div id="baota-container" class="baota-container">
                         <div id="baota-canvas"></div>
+                    </div>
+                    <div class="zoom-controls" id="baota-zoom-controls">
+                        <button id="baota-zoom-in" class="zoom-btn"><i class="fas fa-plus"></i></button>
+                        <button id="baota-zoom-out" class="zoom-btn"><i class="fas fa-minus"></i></button>
+                        <button id="baota-reset" class="zoom-btn"><i class="fas fa-sync-alt"></i></button>
                     </div>
                 </section>
 
@@ -305,6 +306,12 @@
                                 <input type="text" id="person-name" required>
                             </div>
                             <div class="form-group">
+                                <label>别名</label>
+                                <input type="text" id="person-alias" placeholder="请输入别名">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
                                 <label>性别</label>
                                 <select id="person-gender">
                                     <option value="男">男</option>
@@ -354,6 +361,30 @@
                                 </button>
                             </div>
                             <input type="hidden" id="person-avatar">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>籍贯</label>
+                                <input type="text" id="person-birth-place" placeholder="请输入籍贯">
+                            </div>
+                            <div class="form-group">
+                                <label>现居地</label>
+                                <input type="text" id="person-live-place" placeholder="请输入现居地">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>迁出记录</label>
+                            <textarea id="person-move-info" rows="2" placeholder="请输入迁出记录"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>备注</label>
+                            <textarea id="person-remark" rows="2" placeholder="请输入备注"></textarea>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>排序</label>
+                                <input type="text" id="person-sort" placeholder="排序数字">
+                            </div>
                         </div>
                         <div class="form-group">
                             <label>生平简介</label>
