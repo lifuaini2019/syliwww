@@ -705,6 +705,14 @@ class ZupuApp {
 
         // 填充父亲选择框
         this.fillFatherSelect(person.father_id);
+        
+        // 加载过继父亲选择框
+        this.loadAdoptFatherSelect(person.adopt_father_id || '');
+        
+        // 设置过继选择框显示状态
+        const adoptedChecked = person.is_adopted !== undefined ? person.is_adopted : false;
+        document.getElementById('person-adopted').checked = adoptedChecked;
+        document.getElementById('adopt-father-select').style.display = adoptedChecked ? 'flex' : 'none';
 
         // 设置表单只读状态
         const form = document.getElementById('person-form');
@@ -755,6 +763,7 @@ class ZupuApp {
             death_date: isAlive ? '' : document.getElementById('person-death-date').value,
             is_married: document.getElementById('person-married').checked ? 1 : 0,
             is_adopted: document.getElementById('person-adopted').checked ? 1 : 0,
+            adopt_father_id: document.getElementById('adopt-father-combo').value || '',
             generation: document.getElementById('person-generation').value,
             shi_xi: document.getElementById('person-shi-xi').value,
             birth_date: document.getElementById('person-birth-date').value,
@@ -847,6 +856,60 @@ class ZupuApp {
     onSpouseAliveChanged(checked) {
         const deathDateGroup = document.getElementById('spouse-death-group');
         deathDateGroup.style.display = checked ? 'none' : 'block';
+    }
+
+    /**
+     * 是否健在状态改变
+     */
+    onAliveChanged() {
+        const isAlive = document.getElementById('person-alive').checked;
+        const deathDateInput = document.getElementById('person-death-date');
+        deathDateInput.disabled = isAlive;
+        if (isAlive) {
+            deathDateInput.value = '';
+        }
+    }
+
+    /**
+     * 是否过继状态改变
+     */
+    onAdoptedChanged() {
+        const adopted = document.getElementById('person-adopted').checked;
+        const adoptFatherSelect = document.getElementById('adopt-father-select');
+        adoptFatherSelect.style.display = adopted ? 'flex' : 'none';
+        
+        // 如果选中过继，加载父亲列表
+        if (adopted && !document.getElementById('adopt-father-combo').options.length > 1) {
+            this.loadAdoptFatherSelect('');
+        }
+    }
+
+    /**
+     * 加载过继父亲选择框
+     */
+    async loadAdoptFatherSelect(selectedId = '') {
+        try {
+            const response = await api.getPerson();
+            if (response.status === 'success') {
+                const people = response.data || [];
+                const select = document.getElementById('adopt-father-combo');
+                select.innerHTML = '<option value="">-- 请选择父亲 --</option>';
+                
+                people.forEach(person => {
+                    if (person.gender === '男') {
+                        const option = document.createElement('option');
+                        option.value = person.id;
+                        option.text = `${person.name}(${person.generation || '?'}世)`;
+                        if (person.id == selectedId) {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('加载过继父亲列表失败:', error);
+        }
     }
 
     /**
@@ -1042,99 +1105,159 @@ class ZupuApp {
             peopleDict[p.id] = p;
         });
 
-        // 找出最大世代号
-        let maxShiXi = -Infinity;
+        // 为每个人员计算子节点
         people.forEach(p => {
-            const gen = parseInt(p.shi_xi) || 0;
-            maxShiXi = Math.max(maxShiXi, gen);
+            p.children = people.filter(child => child.father_id === p.id);
         });
 
-        // 按世系分组并建立父子关系
-        const groups = {};
-        people.forEach(p => {
-            const shiXi = p.shi_xi || '未知';
-            if (!groups[shiXi]) groups[shiXi] = [];
-            
-            // 计算子节点数量
-            const childrenCount = people.filter(child => child.father_id === p.id).length;
-            
-            // 是否有父亲
-            const hasFather = !!p.father_id && !!peopleDict[p.father_id];
-            
-            // 是否是最后一代
-            const isLastGeneration = (parseInt(p.shi_xi) || 0) === maxShiXi;
-            
-            groups[shiXi].push({
-                ...p,
-                hasFather,
-                childrenCount,
-                isLastGeneration
+        // 找出根节点（没有父亲或父亲不在数据中的人员）
+        const rootNodes = people.filter(p => !p.father_id || !peopleDict[p.father_id]);
+
+        // 如果没有根节点但有人，选取第一个作为根
+        if (rootNodes.length === 0 && people.length > 0) {
+            rootNodes.push(people[0]);
+        }
+
+        // 布局常量
+        const CARD_W = 100;
+        const CARD_H = 120;
+        const H_GAP = 40;  // 兄弟间水平间距
+        const V_GAP = 80;  // 父子间垂直间距
+        const PADDING = 60;
+
+        // 计算子树宽度
+        function getSubtreeWidth(node) {
+            if (!node.children || node.children.length === 0) {
+                return CARD_W;
+            }
+            let totalWidth = 0;
+            node.children.forEach((child, i) => {
+                totalWidth += getSubtreeWidth(child);
+                if (i < node.children.length - 1) {
+                    totalWidth += H_GAP;
+                }
             });
+            return Math.max(CARD_W, totalWidth);
+        }
+
+        // 计算节点位置
+        function layoutNode(node, x, y, level) {
+            const subtreeWidth = getSubtreeWidth(node);
+            const nodeX = x + subtreeWidth / 2 - CARD_W / 2;
+            node.layoutX = nodeX;
+            node.layoutY = y;
+            node.level = level;
+
+            if (node.children && node.children.length > 0) {
+                let childX = x;
+                node.children.forEach((child, i) => {
+                    const childWidth = getSubtreeWidth(child);
+                    layoutNode(child, childX, y + CARD_H + V_GAP, level + 1);
+                    childX += childWidth + H_GAP;
+                });
+            }
+        }
+
+        // 为所有根节点布局
+        let startX = PADDING;
+        rootNodes.forEach(root => {
+            layoutNode(root, startX, PADDING, 0);
+            startX += getSubtreeWidth(root) + PADDING * 2;
+        });
+
+        // 计算画布大小
+        let maxX = 0, maxY = 0;
+        people.forEach(p => {
+            if (p.layoutX !== undefined) {
+                maxX = Math.max(maxX, p.layoutX + CARD_W);
+                maxY = Math.max(maxY, p.layoutY + CARD_H);
+            }
         });
 
         const currentPersonId = this.currentUser?.person_id;
         const currentUserPhone = this.currentUser?.username;
-        
-        let html = '<div class="baota-tree">';
-        
-        // 按世系降序排列（大世代在上，长辈在上）
-        const sortedShiXis = Object.keys(groups).sort((a, b) => parseInt(a) - parseInt(b)); // 升序排列，小世代在上
-        
-        sortedShiXis.forEach((shiXi, index) => {
-            html += `
-                <div class="baota-level">
-                    <div class="baota-level-title">第${shiXi}世</div>
-                    <div class="baota-level-people">
-                        ${groups[shiXi].map(p => {
-                            // 判断是否是自己
-                            const isSelf = p.id === currentPersonId || p.phone === currentUserPhone;
-                            const nameDisplay = isSelf ? `${p.name}(我)` : p.name;
-                            const hasChildren = p.childrenCount > 0;
-                            
-                            return `
-                            <div class="baota-person-wrapper">
-                                <!-- 向上的连接线（连接到父亲） -->
-                                ${p.hasFather ? `
-                                    <div class="connection-up">
-                                        <div class="connection-line-v"></div>
-                                    </div>
-                                ` : ''}
-                                
-                                <!-- 人员卡片 -->
-                                <div class="baota-person ${hasChildren ? 'has-children' : ''}" onclick="app.viewPerson(${p.id})">
-                                    <img src="${p.avatar || ''}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22><rect width=%2260%22 height=%2260%22 fill=%22%23ddd%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22>${p.name[0]}</text></svg>'">
-                                    <div class="person-name">${nameDisplay}</div>
-                                    <div class="person-generation">${p.generation || ''}</div>
-                                    ${hasChildren ? `
-                                        <div class="children-badge">
-                                            <span>${p.childrenCount}</span>
-                                            <span>▼</span>
-                                        </div>
-                                    ` : ''}
-                                </div>
-                                
-                                <!-- 向下的连接线（只要有子节点就一直连下去） -->
-                                ${hasChildren ? `
-                                    <div class="connection-down">
-                                        <div class="connection-line-v"></div>
-                                    </div>
-                                ` : ''}
-                                
-                                <!-- 无儿的人员显示断开标记 -->
-                                ${!hasChildren && !p.isLastGeneration ? `
-                                    <div class="connection-end">
-                                        <span class="end-mark">●</span>
-                                    </div>
-                                ` : ''}
+
+        // 生成所有连接线
+        let linesHtml = '';
+        function generateLines(node) {
+            if (node.children && node.children.length > 0) {
+                const parentCx = node.layoutX + CARD_W / 2;
+                const parentBottomY = node.layoutY + CARD_H;
+
+                // 找出所有孩子的左右边界
+                let leftMost = Infinity, rightMost = -Infinity;
+                node.children.forEach(child => {
+                    leftMost = Math.min(leftMost, child.layoutX);
+                    rightMost = Math.max(rightMost, child.layoutX + CARD_W);
+                });
+                const lineY = parentBottomY + V_GAP / 2;
+
+                if (node.children.length === 1) {
+                    // 独生子：一根垂直线
+                    const childCx = node.children[0].layoutX + CARD_W / 2;
+                    linesHtml += `<line x1="${parentCx}" y1="${parentBottomY}" x2="${childCx}" y2="${node.children[0].layoutY}" stroke="#667eea" stroke-width="2"/>`;
+                } else {
+                    // 多个孩子：父→横线→每个孩子的垂直线
+                    linesHtml += `<line x1="${parentCx}" y1="${parentBottomY}" x2="${parentCx}" y2="${lineY}" stroke="#667eea" stroke-width="2"/>`;
+                    linesHtml += `<line x1="${leftMost + CARD_W/2}" y1="${lineY}" x2="${rightMost - CARD_W/2}" y2="${lineY}" stroke="#667eea" stroke-width="2"/>`;
+                    node.children.forEach(child => {
+                        const childCx = child.layoutX + CARD_W / 2;
+                        linesHtml += `<line x1="${childCx}" y1="${lineY}" x2="${childCx}" y2="${child.layoutY}" stroke="#667eea" stroke-width="2"/>`;
+                    });
+                }
+
+                node.children.forEach(child => generateLines(child));
+            }
+        }
+
+        rootNodes.forEach(root => generateLines(root));
+
+        // 生成所有节点HTML - 左右分栏显示夫妻
+        let nodesHtml = '';
+        people.forEach(p => {
+            if (p.layoutX !== undefined) {
+                const isSelf = p.id === currentPersonId || p.phone === currentUserPhone;
+                const nameDisplay = isSelf ? `${p.name}(我)` : p.name;
+                const hasChildren = p.children && p.children.length > 0;
+                const hasSpouse = p.spouse_name && p.spouse_name.trim() !== '';
+
+                nodesHtml += `
+                    <div class="baota-card ${hasChildren ? 'has-children' : ''}" 
+                         style="left: ${p.layoutX}px; top: ${p.layoutY}px; width: ${CARD_W}px; height: ${CARD_H}px;"
+                         onclick="app.viewPerson(${p.id})">
+                        <div class="baota-couple">
+                            <!-- 左侧：本人 -->
+                            <div class="baota-person-half">
+                                <img class="baota-avatar" src="${p.avatar || ''}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><rect width=%2240%22 height=%2240%22 fill=%22%23e8e0f0%22 rx=%2250%%25/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23667eea%22 font-size=%2216%22>${p.name[0] || '?'}</text></svg>'">
+                                <div class="baota-name-vertical">${nameDisplay}</div>
                             </div>
-                        `}).join('')}
+                            <!-- 分隔线 -->
+                            <div class="baota-divider"></div>
+                            <!-- 右侧：配偶 -->
+                            <div class="baota-person-half spouse-half">
+                                ${hasSpouse ? `
+                                    <img class="baota-avatar" src="${p.spouse_avatar || ''}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><rect width=%2240%22 height=%2240%22 fill=%22%23f0e8e8%22 rx=%2250%%25/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23c97b7b%22 font-size=%2216%22>${p.spouse_name[0] || '?'}</text></svg>'">
+                                    <div class="baota-name-vertical spouse-name">${p.spouse_name}</div>
+                                ` : `
+                                    <div class="baota-no-spouse">-</div>
+                                `}
+                            </div>
+                        </div>
+                        ${hasChildren ? `<div class="baota-badge">${p.children.length}</div>` : ''}
                     </div>
-                </div>
-            `;
+                `;
+            }
         });
-        
-        html += '</div>';
-        canvas.innerHTML = html || '<p style="text-align: center; color: #999;">暂无数据</p>';
+
+        // 组装完整SVG + HTML
+        canvas.innerHTML = `
+            <div class="baota-tree-container" style="position: relative; width: ${maxX + PADDING}px; height: ${maxY + PADDING}px;">
+                <svg style="position: absolute; left: 0; top: 0; width: ${maxX + PADDING}px; height: ${maxY + PADDING}px; overflow: visible;" >
+                    ${linesHtml}
+                </svg>
+                ${nodesHtml}
+            </div>
+        `;
     }
 
     /**

@@ -323,30 +323,42 @@
                                 <input type="text" id="person-phone" placeholder="作为登录账号">
                             </div>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>是否健在</label>
-                                <div style="display: flex; align-items: center; gap: 10px; height: 40px;">
-                                    <input type="checkbox" id="person-alive" checked>
-                                    <span>健在</span>
-                                </div>
+                        
+                        <!-- ═══════ 三个重要状态钩选（独立分组，明显区分）═══════ -->
+                        <div class="status-group">
+                            <h3 class="status-group-title">📋 人员状态</h3>
+                            
+                            <!-- 是否健在（绿色主题） -->
+                            <div class="status-item status-alive">
+                                <label class="status-label">是否健在</label>
+                                <input type="checkbox" id="person-alive" checked onchange="app.onAliveChanged()">
+                                <span class="status-text">健在</span>
                             </div>
-                            <div class="form-group">
-                                <label>是否已婚</label>
-                                <div style="display: flex; align-items: center; gap: 10px; height: 40px;">
-                                    <input type="checkbox" id="person-married" checked>
-                                    <span>已婚</span>
+                            
+                            <!-- 是否已婚（粉色主题） -->
+                            <div class="status-item status-married">
+                                <label class="status-label">是否已婚</label>
+                                <input type="checkbox" id="person-married" checked>
+                                <span class="status-text">已婚</span>
+                            </div>
+                            
+                            <!-- 是否过继 + 过继父亲选择（蓝色主题） -->
+                            <div class="status-item status-adopted">
+                                <label class="status-label">是否过继</label>
+                                <input type="checkbox" id="person-adopted" onchange="app.onAdoptedChanged()">
+                                <span class="status-text">过继</span>
+                                
+                                <!-- 过继父亲选择（默认隐藏） -->
+                                <div class="adopt-father-select" id="adopt-father-select" style="display: none;">
+                                    <label>过继父亲:</label>
+                                    <select id="adopt-father-combo">
+                                        <option value="">-- 请选择父亲 --</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
+                        
                         <div class="form-row">
-                            <div class="form-group">
-                                <label>是否过继</label>
-                                <div style="display: flex; align-items: center; gap: 10px; height: 40px;">
-                                    <input type="checkbox" id="person-adopted">
-                                    <span>过继</span>
-                                </div>
-                            </div>
                             <div class="form-group">
                                 <label>去世日期</label>
                                 <input type="date" id="person-death-date" min="1736-01-01">

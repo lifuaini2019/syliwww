@@ -497,7 +497,133 @@ body {
     transform: scale(0.95);
 }
 
-/* 宝塔树样式 - 带父子关系连接 */
+/* 宝塔树 - 经典父子树形布局（夫妻左右分栏） */
+.baota-tree-container {
+    position: relative;
+    overflow: auto;
+}
+
+.baota-card {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    border-radius: 12px;
+    padding: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 1;
+}
+
+.baota-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    z-index: 10;
+}
+
+/* 夫妻容器 - 左右分栏 */
+.baota-couple {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    height: 100%;
+    gap: 2px;
+}
+
+/* 左右半边 */
+.baota-person-half {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+}
+
+.spouse-half {
+    background: rgba(255, 200, 200, 0.1);
+    border-radius: 0 8px 8px 0;
+}
+
+.baota-person-half:first-child {
+    border-radius: 8px 0 0 8px;
+    background: rgba(230, 220, 255, 0.15);
+}
+
+/* 分隔线 */
+.baota-divider {
+    width: 1px;
+    background: linear-gradient(to bottom, transparent, #ddd, transparent);
+    margin: 4px 0;
+}
+
+/* 头像 */
+.baota-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #667eea;
+    margin-bottom: 3px;
+}
+
+.spouse-half .baota-avatar {
+    border-color: #c97b7b;
+}
+
+/* 垂直显示的名字 */
+.baota-name-vertical {
+    font-size: 11px;
+    font-weight: bold;
+    color: #333;
+    text-align: center;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    letter-spacing: 1px;
+    max-height: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+}
+
+.spouse-name {
+    color: #c97b7b;
+}
+
+/* 无配偶显示 */
+.baota-no-spouse {
+    color: #ccc;
+    font-size: 20px;
+    writing-mode: vertical-rl;
+    margin-top: 18px;
+}
+
+/* 子节点徽章 */
+.baota-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-size: 10px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
+}
+
+.baota-card.has-children {
+    border: 2px solid #667eea;
+}
+
+/* 旧版宝塔树样式（保留兼容） */
 .baota-tree {
     display: flex;
     flex-direction: column;
@@ -536,7 +662,6 @@ body {
     align-items: center;
 }
 
-/* 向上的连接线 */
 .connection-up {
     display: flex;
     flex-direction: column;
@@ -563,12 +688,10 @@ body {
     white-space: nowrap;
 }
 
-/* 向下的连接线 */
 .connection-down {
     margin-top: 10px;
 }
 
-/* 无儿的人员显示结束标记 */
 .connection-end {
     height: 30px;
     display: flex;
@@ -582,7 +705,6 @@ body {
     color: #999;
 }
 
-/* 人员卡片 */
 .baota-person {
     display: flex;
     flex-direction: column;
@@ -611,41 +733,40 @@ body {
     height: 60px;
     border-radius: 50%;
     object-fit: cover;
-    border: 3px solid #f0f0f0;
-    margin-bottom: 8px;
+    border: 3px solid #667eea;
 }
 
 .baota-person .person-name {
     font-size: 14px;
-    font-weight: 600;
+    font-weight: bold;
     color: #333;
+    margin-top: 8px;
     text-align: center;
-    margin-bottom: 2px;
 }
 
 .baota-person .person-generation {
     font-size: 12px;
-    color: #999;
+    color: #666;
+    margin-top: 4px;
 }
 
-/* 子节点徽章 */
 .children-badge {
     position: absolute;
-    bottom: -10px;
+    top: -10px;
+    right: -10px;
     background: #667eea;
     color: white;
-    border-radius: 15px;
-    padding: 2px 10px;
     font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-weight: bold;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
 }
 
-/* 宝塔层级间距 */
-.baota-level {
-    margin-bottom: 0;
-    padding-bottom: 30px;
+.children-badge span:last-child {
+    font-size: 10px;
 }
 
 /* 卡片 */
@@ -786,6 +907,112 @@ body {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 15px;
+}
+
+/* ═══════ 三个重要状态钩选样式（独立分组，明显区分）═══════ */
+.status-group {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 2px solid #dee2e6;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 15px 0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.status-group-title {
+    margin: 0 0 20px 0;
+    font-size: 16px;
+    font-weight: bold;
+    color: #495057;
+    text-align: center;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    margin: 10px 0;
+    border-radius: 8px;
+    gap: 10px;
+    transition: all 0.3s ease;
+}
+
+/* 是否健在 - 绿色主题 */
+.status-alive {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border-left: 4px solid #28a745;
+}
+
+.status-alive:hover {
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+}
+
+/* 是否已婚 - 粉色主题 */
+.status-married {
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    border-left: 4px solid #dc3545;
+}
+
+.status-married:hover {
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+}
+
+/* 是否过继 - 蓝色主题 */
+.status-adopted {
+    background: linear-gradient(135deg, #cce5ff 0%, #b8daff 100%);
+    border-left: 4px solid #007bff;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.status-adopted:hover {
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+}
+
+.status-label {
+    font-weight: bold;
+    color: #495057;
+    min-width: 80px;
+}
+
+.status-text {
+    color: #6c757d;
+    font-size: 14px;
+}
+
+/* 过继父亲选择下拉框 */
+.adopt-father-select {
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px;
+    background: white;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.adopt-father-select label {
+    font-weight: bold;
+    color: #007bff;
+    min-width: 80px;
+}
+
+.adopt-father-select select {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #007bff;
+    border-radius: 6px;
+    background-color: #f8f9fa;
+    cursor: pointer;
+}
+
+.adopt-father-select select:focus {
+    outline: none;
+    border-color: #0056b3;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
 }
 
 .avatar-upload {
