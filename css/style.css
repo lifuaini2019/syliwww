@@ -497,130 +497,167 @@ body {
     transform: scale(0.95);
 }
 
-/* 宝塔树 - 经典父子树形布局（夫妻左右分栏） */
-.baota-tree-container {
-    position: relative;
-    overflow: auto;
+/* ═══ 世系图 — 可视化递归树形布局 ═══ */
+#tree-canvas {
+    min-width: 100%;
+    min-height: 100%;
+    padding: 10px;
+    transform-origin: top left;
 }
 
-.baota-card {
+.tree-svg-container {
+    position: relative;
+}
+
+/* 世系图卡片（与宝塔树共用风格） */
+.tree-card, .baota-card {
     position: absolute;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
     background: white;
-    border-radius: 12px;
-    padding: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    border-radius: 10px;
+    padding: 6px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.1);
     cursor: pointer;
-    transition: all 0.3s ease;
-    z-index: 1;
+    transition: all 0.2s ease;
+    z-index: 2;
+    border: 2px solid #e0e0e0;
 }
 
-.baota-card:hover {
+.tree-card:hover, .baota-card:hover {
     transform: scale(1.05);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
-    z-index: 10;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+    z-index: 15;
 }
 
-/* 夫妻容器 - 左右分栏 */
-.baota-couple {
+.tree-card.has-children, .baota-card.has-children {
+    border-color: #667eea;
+    background: linear-gradient(180deg, #f0f4ff 0%, #fff 100%);
+}
+
+/* ═══ 已婚：头像一分为二 ═══ */
+.tree-avatar-split, .baota-avatar-split {
     display: flex;
-    align-items: stretch;
-    width: 100%;
+    flex-direction: row;
+    width: calc(100% - 8px);
+    height: 60px;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.baota-av-half, .tree-av-half {
+    width: 50%;
     height: 100%;
-    gap: 2px;
-}
-
-/* 左右半边 */
-.baota-person-half {
-    flex: 1;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 2px;
+    overflow: hidden;
 }
 
-.spouse-half {
-    background: rgba(255, 200, 200, 0.1);
-    border-radius: 0 8px 8px 0;
+.baota-av-self, .tree-av-self {
+    background: linear-gradient(135deg, #667eea 0%, #5a67d8 100%);
+    border-right: 1px solid rgba(255,255,255,0.3);
 }
 
-.baota-person-half:first-child {
-    border-radius: 8px 0 0 8px;
-    background: rgba(230, 220, 255, 0.15);
+.baota-av-spouse, .tree-av-spouse {
+    background: linear-gradient(135deg, #fbb6ce 0%, #f687b3 100%);
 }
 
-/* 分隔线 */
-.baota-divider {
-    width: 1px;
-    background: linear-gradient(to bottom, transparent, #ddd, transparent);
-    margin: 4px 0;
+/* ═══ 未婚：单头像 ═══ */
+.tree-avatar-single, .baota-avatar-single {
+    width: calc(100% - 8px);
+    height: 60px;
+    border-radius: 6px;
+    overflow: hidden;
 }
 
-/* 头像 */
-.baota-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
+.baota-av-single-inner, .tree-av-single-inner {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #5a67d8 100%);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+/* 头像图片 */
+.tree-avatar-split img, .baota-avatar-split img,
+.tree-avatar-single img, .baota-avatar-single img,
+.baota-av-single-inner img, .tree-av-single-inner img,
+.baota-av-half img, .tree-av-half img {
+    width: 100%; height: 100%;
     object-fit: cover;
-    border: 2px solid #667eea;
-    margin-bottom: 3px;
 }
 
-.spouse-half .baota-avatar {
-    border-color: #c97b7b;
+/* 占位文字 */
+.av-ph {
+    font-size: 18px; color: rgba(255,255,255,0.9); font-weight: bold;
 }
 
-/* 垂直显示的名字 */
-.baota-name-vertical {
+/* 可点击区域交互 */
+.clickable-area {
+    transition: opacity 0.12s;
+}
+.clickable-area:active { opacity: 0.65; }
+
+/* ═══ 名字区 ═══ */
+
+/* 已婚双列 */
+.tree-name-row, .baota-name-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-start;
+    margin-top: 4px;
+    gap: 3px;
+    width: 100%;
+}
+
+/* 未婚单列 */
+.tree-name-single, .baota-name-single {
+    display: flex;
+    justify-content: center;
+    margin-top: 4px;
+    width: 100%;
+}
+
+/* 竖排名字 */
+.tree-vname, .baota-vname {
     font-size: 11px;
     font-weight: bold;
-    color: #333;
-    text-align: center;
     writing-mode: vertical-rl;
     text-orientation: upright;
     letter-spacing: 1px;
-    max-height: 60px;
+    max-height: 55px;
     overflow: hidden;
     text-overflow: ellipsis;
-    line-height: 1.2;
+    line-height: 1.25;
+    color: #333;
+    flex: 1;
+    text-align: center;
+    padding: 1px 3px;
 }
 
-.spouse-name {
+.tree-vname.spouse, .baota-vname.spouse {
     color: #c97b7b;
+    font-weight: normal;
 }
 
-/* 无配偶显示 */
-.baota-no-spouse {
-    color: #ccc;
-    font-size: 20px;
-    writing-mode: vertical-rl;
-    margin-top: 18px;
-}
-
-/* 子节点徽章 */
-.baota-badge {
+/* 子女数量徽章 */
+.tree-badge, .baota-badge {
     position: absolute;
-    top: -8px;
-    right: -8px;
+    top: -7px; right: -7px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     font-size: 10px;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     font-weight: bold;
-    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
-}
-
-.baota-card.has-children {
-    border: 2px solid #667eea;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 6px rgba(102,126,234,0.35);
 }
 
 /* 旧版宝塔树样式（保留兼容） */
