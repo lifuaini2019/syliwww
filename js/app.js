@@ -1118,9 +1118,9 @@ class ZupuApp {
             rootNodes.push(people[0]);
         }
 
-        // 布局常量
+        // 布局常量（对齐小程序和PY端）
         const CARD_W = 100;
-        const CARD_H = 120;
+        const CARD_H = 140;
         const H_GAP = 40;  // 兄弟间水平间距
         const V_GAP = 80;  // 父子间垂直间距
         const PADDING = 60;
@@ -1212,7 +1212,7 @@ class ZupuApp {
 
         rootNodes.forEach(root => generateLines(root));
 
-        // 生成所有节点HTML - 左右分栏显示夫妻
+        // 生成所有节点HTML - 左右分栏显示夫妻（配偶独立可点击）
         let nodesHtml = '';
         people.forEach(p => {
             if (p.layoutX !== undefined) {
@@ -1220,23 +1220,25 @@ class ZupuApp {
                 const nameDisplay = isSelf ? `${p.name}(我)` : p.name;
                 const hasChildren = p.children && p.children.length > 0;
                 const hasSpouse = p.spouse_name && p.spouse_name.trim() !== '';
+                const isMarried = p.is_married == 1;
 
                 nodesHtml += `
-                    <div class="baota-card ${hasChildren ? 'has-children' : ''}" 
-                         style="left: ${p.layoutX}px; top: ${p.layoutY}px; width: ${CARD_W}px; height: ${CARD_H}px;"
-                         onclick="app.viewPerson(${p.id})">
+                    <div class="baota-card ${hasChildren ? 'has-children' : ''}"
+                         style="left: ${p.layoutX}px; top: ${p.layoutY}px; width: ${CARD_W}px; height: ${CARD_H}px;">
                         <div class="baota-couple">
-                            <!-- 左侧：本人 -->
-                            <div class="baota-person-half">
-                                <img class="baota-avatar" src="${p.avatar || ''}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><rect width=%2240%22 height=%2240%22 fill=%22%23e8e0f0%22 rx=%2250%%25/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23667eea%22 font-size=%2216%22>${p.name[0] || '?'}</text></svg>'">
-                                <div class="baota-name-vertical">${nameDisplay}</div>
+                            <!-- 左侧：本人（独立可点击）-->
+                            <div class="baota-person-half self-half"
+                                 onclick="event.stopPropagation(); app.viewPerson(${p.id});">
+                                <img class="baota-avatar" src="${p.avatar || ''}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><rect width=%2240%22 height=%2240%22 fill=%22%235b8cda%22 rx=%2250%%25/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23fff%22 font-size=%2216%22>${p.name[0] || '?'}</text></svg>'">
+                                <div class="baota-name-vertical self-name">${nameDisplay}</div>
                             </div>
                             <!-- 分隔线 -->
                             <div class="baota-divider"></div>
-                            <!-- 右侧：配偶 -->
-                            <div class="baota-person-half spouse-half">
+                            <!-- 右侧：配偶（独立可点击）-->
+                            <div class="baota-person-half spouse-half"
+                                 onclick="event.stopPropagation(); ${hasSpouse ? `app.showSpouseInfo('${p.spouse_name}', '${p.spouse_avatar || ''}')` : ''}">
                                 ${hasSpouse ? `
-                                    <img class="baota-avatar" src="${p.spouse_avatar || ''}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><rect width=%2240%22 height=%2240%22 fill=%22%23f0e8e8%22 rx=%2250%%25/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23c97b7b%22 font-size=%2216%22>${p.spouse_name[0] || '?'}</text></svg>'">
+                                    <img class="baota-avatar spouse-avatar" src="${p.spouse_avatar || ''}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><rect width=%2240%22 height=%2240%22 fill=%22%23ff9a9e%22 rx=%2250%%25/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23fff%22 font-size=%2216%22>${p.spouse_name[0] || '?'}</text></svg>'">
                                     <div class="baota-name-vertical spouse-name">${p.spouse_name}</div>
                                 ` : `
                                     <div class="baota-no-spouse">-</div>
