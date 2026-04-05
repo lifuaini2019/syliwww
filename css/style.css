@@ -508,23 +508,24 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     background: white;
-    border-radius: 12px;
-    padding: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    border-radius: 10px;
+    padding: 6px;
+    box-shadow: 0 3px 14px rgba(0,0,0,0.13);
     cursor: pointer;
-    transition: all 0.3s ease;
-    z-index: 1;
+    transition: all 0.25s ease;
+    z-index: 5;
+    border: 2px solid #ddd;
 }
 
 .baota-card:hover {
-    transform: scale(1.05);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.25);
     z-index: 10;
 }
 
-/* 夫妻容器 - 左右分栏 */
+/* 夫妻容器 - 左右分栏（对齐小程序）*/
 .baota-couple {
     display: flex;
     align-items: stretch;
@@ -533,64 +534,87 @@ body {
     gap: 2px;
 }
 
-/* 左右半边 */
+/* 左右半边 - 独立可点击 */
 .baota-person-half {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 2px;
+    justify-content: flex-start;
+    padding: 3px 2px;
+    cursor: pointer;
+    transition: opacity 0.15s;
 }
 
-.spouse-half {
-    background: rgba(255, 200, 200, 0.1);
-    border-radius: 0 8px 8px 0;
+.baota-person-half:hover {
+    opacity: 0.85;
 }
 
-.baota-person-half:first-child {
+/* 本人半边 */
+.self-half {
     border-radius: 8px 0 0 8px;
-    background: rgba(230, 220, 255, 0.15);
+    background: linear-gradient(135deg, rgba(91, 140, 218, 0.08) 0%, rgba(63, 81, 181, 0.05) 100%);
+}
+
+/* 配偶半边 */
+.spouse-half {
+    background: linear-gradient(135deg, rgba(255, 154, 158, 0.08) 0%, rgba(254, 207, 239, 0.05) 100%);
+    border-radius: 0 8px 8px 0;
 }
 
 /* 分隔线 */
 .baota-divider {
     width: 1px;
-    background: linear-gradient(to bottom, transparent, #ddd, transparent);
-    margin: 4px 0;
+    background: #e6e6e6;
+    margin: 5px 0;
 }
 
-/* 头像 */
+/* 头像样式 */
 .baota-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
     object-fit: cover;
-    border: 2px solid #667eea;
-    margin-bottom: 3px;
+    margin-bottom: 4px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.self-half .baota-avatar {
+    border: 2px solid #5b8cda;
 }
 
 .spouse-half .baota-avatar {
-    border-color: #c97b7b;
+    border: 2px solid #ff9a9e;
 }
 
-/* 垂直显示的名字 */
+/* 垂直显示的名字（对齐小程序）*/
 .baota-name-vertical {
     font-size: 11px;
-    font-weight: bold;
-    color: #333;
+    font-weight: 600;
     text-align: center;
-    writing-mode: vertical-rl;
+    writing-mode: vertical-lr;
     text-orientation: upright;
     letter-spacing: 1px;
-    max-height: 60px;
+    line-height: 1.35;
+    max-height: 65px;
     overflow: hidden;
     text-overflow: ellipsis;
-    line-height: 1.2;
+    white-space: nowrap;
+    padding: 2px 4px;
+    border-radius: 4px;
 }
 
+/* 本人名字 */
+.self-name {
+    color: #333;
+    background: rgba(91, 140, 218, 0.08);
+}
+
+/* 配偶名字 */
 .spouse-name {
-    color: #c97b7b;
+    color: #888;
+    font-weight: 400;
+    background: rgba(244, 143, 177, 0.08);
 }
 
 /* 无配偶显示 */

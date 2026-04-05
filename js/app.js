@@ -578,6 +578,41 @@ class ZupuApp {
     }
 
     /**
+     * 显示配偶信息（宝塔树专用）
+     */
+    showSpouseInfo(spouseName, spouseAvatar) {
+        if (!spouseName || !spouseName.trim()) return;
+
+        // 创建配偶信息弹窗
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'spouse-info-modal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 400px;">
+                <div class="modal-header" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);">
+                    <h3>配偶信息</h3>
+                    <button class="close-btn" onclick="document.getElementById('spouse-info-modal').remove()">&times;</button>
+                </div>
+                <div class="modal-body" style="text-align: center; padding: 30px;">
+                    <img src="${spouseAvatar}" alt="${spouseName}"
+                         style="width: 120px; height: 120px; border-radius: 50%; border: 4px solid #ff9a9e; object-fit: cover; margin-bottom: 20px;"
+                         onerror="this.style.display='none'">
+                    <h4 style="font-size: 24px; color: #333; margin-bottom: 10px;">${spouseName}</h4>
+                    <p style="color: #888; font-size: 14px;">（非族谱成员）</p>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        // 点击遮罩关闭
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+    }
+
+    /**
      * 打开添加人员弹窗
      */
     openAddPersonModal() {
