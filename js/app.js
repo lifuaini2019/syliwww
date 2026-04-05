@@ -1411,6 +1411,8 @@ class ZupuApp {
         const CARD_H = 140;
         const H_GAP = 40;  // 兄弟间水平间距
         const V_GAP = 80;  // 父子间垂直间距
+        const V_PARENT_TO_LINE = 50;  // 父底边 → 横线的垂直距离
+        const V_LINE_TO_CHILD = 50;   // 横线 → 孩子顶边的垂直距离
         const PADDING = 60;
 
         const allNodes = [];
