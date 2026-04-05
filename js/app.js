@@ -786,7 +786,7 @@ class ZupuApp {
         }
         modal.innerHTML = cardHtml;
         modal.classList.remove('hidden');
-    },
+    }
 
     /**
      * 打开人员编辑表单（原有逻辑）
@@ -1254,7 +1254,7 @@ class ZupuApp {
                 </svg>
                 ${nodesHtml}
             </div>`;
-    },
+    }
 
     /**
      * 显示配偶弹窗
@@ -1273,7 +1273,7 @@ class ZupuApp {
             spouse_of: personData.name
         };
         this.openPersonModal(spouseObj, false);
-    },
+    }
 
     /**
      * 四方向关系入口：管理员添加关系人
@@ -1288,7 +1288,7 @@ class ZupuApp {
         }
         this.showToast(`${title} — (功能开发中...)`);
         // TODO: 后续可打开添加人员表单，并预填 father_id 等关联字段
-    },
+    }
 
     /**
      * 世系图缩放
@@ -1401,7 +1401,6 @@ class ZupuApp {
         const rootNodes = people.filter(p => !p.father_id || !peopleDict[p.father_id]);
         if (rootNodes.length === 0 && people.length > 0) rootNodes.push(people[0]);
 
-<<<<<<< HEAD
         // 如果没有根节点但有人，选取第一个作为根
         if (rootNodes.length === 0 && people.length > 0) {
             rootNodes.push(people[0]);
@@ -1413,17 +1412,6 @@ class ZupuApp {
         const H_GAP = 40;  // 兄弟间水平间距
         const V_GAP = 80;  // 父子间垂直间距
         const PADDING = 60;
-=======
-        // ═══ 布局常量（px）═══
-        const CARD_W = 100;
-        const CARD_H = 130;
-        const SIBLING_GAP = 65;
-        const SUBTREE_GAP = 35;
-        const V_PARENT_TO_LINE = 45;
-        const V_LINE_TO_CHILD = 45;
-        const LINE_W = 3;
-        const PADDING = 30;
->>>>>>> 2530fc464e1bd0c88ff8471aa1ab7ddf25be7700
 
         const allNodes = [];
         const allLines = [];
@@ -1505,7 +1493,6 @@ class ZupuApp {
         const currentPersonId = this.currentUser?.person_id;
         const currentUserPhone = this.currentUser?.username;
 
-<<<<<<< HEAD
         // 生成所有连接线
         let linesHtml = '';
         function generateLines(node) {
@@ -1578,68 +1565,12 @@ class ZupuApp {
                     </div>
                 `;
             }
-=======
-        // ═══ 生成 SVG 连线 ═══
-        let svgLines = '';
-        allLines.forEach(L => {
-            const color = L.type === 'v-thin' ? '#aaa' : '#667eea';
-            const sw = L.type === 'v-thin' ? 1.5 : LINE_W;
-            svgLines += `<line x1="${L.x1}" y1="${L.y1}" x2="${L.x2}" y2="${L.y2}" stroke="${color}" stroke-width="${sw}"/>`;
-        });
-
-        // ═══ 生成节点卡片 HTML（智能卡片：is_married判断 + 独立点击） ═══
-        let nodesHtml = '';
-        allNodes.forEach(n => {
-            const p = n.person;
-            const isSelf = p.id === currentPersonId || p.phone === currentUserPhone;
-            const nameDisplay = isSelf ? `${p.name}(我)` : p.name;
-            const hasChildren = p.children && p.children.length > 0;
-            const isMarried = p.is_married === 1;
-            const hasSpouse = p.spouse_name && p.spouse_name.trim() !== '';
-
-            nodesHtml += `
-            <div class="baota-card ${hasChildren ? 'has-children' : ''}"
-                 style="left:${n.x}px;top:${n.y}px;width:${CARD_W}px;height:${CARD_H}px;">
-                ${isMarried ? `
-                    <!-- 已婚：双头像 -->
-                    <div class="baota-avatar-split">
-                        <div class="baota-av-half baota-av-self clickable-area" onclick="app.viewPerson(${p.id})">
-                            <img src="${p.avatar||''}" onerror="this.parentElement.innerHTML='<span class=\\'av-ph\\'>${p.name[0]||'?'}</span>'">
-                        </div>
-                        <div class="baota-av-half baota-av-spouse clickable-area"
-                             onclick="${hasSpouse?`app.viewSpouse(${JSON.stringify(p).replace(/"/g,'&quot;')})`:'void(0)'}">
-                            ${hasSpouse?
-                                `<img src="${p.spouse_avatar||''}" onerror="this.parentElement.innerHTML='<span class=\\'av-ph\\'>${p.spouse_name[0]||'配'}</span>'">`
-                                :'<span class="av-ph">-</span>'
-                            }
-                        </div>
-                    </div>
-                    <!-- 双列垂直名字 -->
-                    <div class="baota-name-row">
-                        <span class="baota-vname clickable-area" onclick="app.viewPerson(${p.id})">${nameDisplay}</span>
-                        ${hasSpouse ? `<span class="baota-vname spouse clickable-area" onclick="app.viewSpouse(${JSON.stringify(p).replace(/"/g,'&quot;')})">${p.spouse_name}</span>` : '<span class="baota-vname spouse"></span>'}
-                    </div>
-                ` : `
-                    <!-- 未婚：单头像 -->
-                    <div class="baota-avatar-single">
-                        <div class="baota-av-single-inner clickable-area" onclick="app.viewPerson(${p.id})">
-                            <img src="${p.avatar||''}" onerror="this.parentElement.innerHTML='<span class=\\'av-ph\\'>${p.name[0]||'?'}</span>'">
-                        </div>
-                    </div>
-                    <!-- 单列名字 -->
-                    <div class="baota-name-single clickable-area" onclick="app.viewPerson(${p.id})">
-                        <span class="baota-vname">${nameDisplay}</span>
-                    </div>
-                `}
-                ${hasChildren ? `<div class="baota-badge">${p.children.length}</div>` : ''}
-            </div>`;
->>>>>>> 2530fc464e1bd0c88ff8471aa1ab7ddf25be7700
         });
 
         canvas.innerHTML = `
             <div class="baota-tree-container" style="position:relative;width:${canvasW}px;height:${canvasH}px;">
                 <svg style="position:absolute;left:0;top:0;width:${canvasW}px;height:${canvasH}px;overflow:visible;">
-                    ${svgLines}
+                    ${linesHtml}
                 </svg>
                 ${nodesHtml}
             </div>`;
