@@ -703,8 +703,8 @@ class ZupuApp {
         
         // 查看模式：显示简洁信息卡片 + 四方向关系入口
         this.openPersonViewCard(person, isAdmin);
-    },
-    
+    }
+
     /**
      * 打开人员查看卡片（含四方向关系入口）
      */
