@@ -654,13 +654,113 @@ class ZupuApp {
     }
 
     /**
-     * 打开人员弹窗
+     * 打开人员信息弹窗（查看模式 — 含四方向关系入口）
      */
     openPersonModal(person, editable) {
+        // 判断是否管理员（控制关系入口显示）
+        const isAdmin = this.currentUser?.role === 'admin' || this.currentUser?.role === 'super_admin';
+        
+        // 如果是可编辑模式且不是从树图点击的，使用原有表单弹窗
+        if (editable) {
+            this.openPersonEditModal(person);
+            return;
+        }
+        
+        // 查看模式：显示简洁信息卡片 + 四方向关系入口
+        this.openPersonViewCard(person, isAdmin);
+    },
+    
+    /**
+     * 打开人员查看卡片（含四方向关系入口）
+     */
+    openPersonViewCard(person, isAdmin) {
+        const isMarried = person.is_married === 1;
+        const hasSpouse = person.spouse_name && person.spouse_name.trim() !== '';
+        const name = person.name || person.displayName || '未知';
+        
+        // 构建HTML
+        const cardHtml = `
+        <div class="view-card-wrap">
+            <!-- ═══ 四方向关系入口（管理员可见）═══ -->
+            <div class="rel-btn rel-top ${isAdmin ? '' : 'rel-hidden'}"
+                 onclick="app.onAddRelation('${person.id || ''}', '${name}', 'father')">
+                <span class="rel-icon">↑</span><span class="rel-text">父亲</span>
+            </div>
+            <div class="rel-btn rel-bottom ${isAdmin ? '' : 'rel-hidden'}"
+                 onclick="app.onAddRelation('${person.id || ''}', '${name}', 'child')">
+                <span class="rel-icon">↓</span><span class="rel-text">子女</span>
+            </div>
+            <div class="rel-btn rel-left ${isAdmin && !isMarried ? '' : 'rel-hidden'}"
+                 onclick="app.onAddRelation('${person.id || ''}', '${name}', 'spouse')">
+                <span class="rel-icon">←</span><span class="rel-text">配偶</span>
+            </div>
+            <div class="rel-btn rel-right ${isAdmin ? '' : 'rel-hidden'}"
+                 onclick="app.onAddRelation('${person.id || ''}', '${name}', 'sibling')">
+                <span class="rel-icon">→</span><span class="rel-text">兄弟</span>
+            </div>
+
+            <!-- 信息卡片主体 -->
+            <div class="vc-card">
+                <div class="vc-hd">
+                    <img class="vc-avatar" src="${person.avatar || ''}" 
+                         onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22><rect width=%2260%22 height=%2260%22 fill=%22%23ddd%22 rx=%2230%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.35em%22 fill=%22%23999%22 font-size=24>${name[0]||'?'}</text></svg>'">
+                    <div class="vc-name-row">
+                        <span class="vc-name">${name}</span>
+                        ${person.shi_xi ? `<span class="vc-gen">第${person.shi_xi}世</span>` : ''}
+                    </div>
+                </div>
+                
+                <div class="vc-bd">
+                    <div class="vc-grid">
+                        <div class="vc-item"><span class="vc-lbl">姓名</span><span class="vc-val">${name}</span></div>
+                        <div class="vc-item"><span class="vc-lbl">性别</span><span class="vc-val">${person.gender || '-'}</span></div>
+                    </div>
+                    <div class="vc-grid">
+                        <div class="vc-item"><span class="vc-lbl">字辈</span><span class="vc-val">${person.generation || '-'}</span></div>
+                        <div class="vc-item"><span class="vc-lbl">排行</span><span class="vc-val">${person.ranking || '-'}</span></div>
+                    </div>
+                    <div class="vc-grid">
+                        <div class="vc-item"><span class="vc-lbl">别名</span><span class="vc-val">${person.alias || '-'}</span></div>
+                        <div class="vc-item"><span class="vc-lbl">生日</span><span class="vc-val">${person.birth_date || '-'}</span></div>
+                    </div>
+                    
+                    ${hasSpouse ? `<div class="vc-extra"><span class="vc-lbl">配偶</span><span class="vc-val spouse-color">${person.spouse_name}</span></div>` : ''}
+                    ${person.death_date ? `<div class="vc-extra"><span class="vc-lbl">去世</span><span class="vc-val death-color">${person.death_date}</span></div>` : ''}
+                    ${person.spouse_of ? `<div class="vc-extra"><span class="vc-lbl">配偶是</span><span class="vc-val">${person.spouse_of}</span></div>` : ''}
+                </div>
+                
+                <div class="vc-ft">
+                    ${person.is_db_person !== false ? 
+                        `<button class="btn btn-primary vc-btn" onclick="app.editPerson(${person.id})">编辑此人员 ›</button>` :
+                        '<span class="vc-hint">配偶信息（非独立成员）</span>'
+                    }
+                </div>
+                
+                <button class="vc-close" onclick="document.getElementById('view-card-modal').classList.add('hidden')">&times;</button>
+            </div>
+        </div>
+        `;
+        
+        // 创建或更新模态框
+        let modal = document.getElementById('view-card-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'view-card-modal';
+            modal.className = 'modal view-card-modal hidden';
+            document.body.appendChild(modal);
+        }
+        modal.innerHTML = cardHtml;
+        modal.classList.remove('hidden');
+    },
+
+    /**
+     * 打开人员编辑表单（原有逻辑）
+     */
+    openPersonEditModal(person) {
         const modal = document.getElementById('person-modal');
         const title = document.getElementById('person-modal-title');
         
-        title.textContent = editable ? '编辑人员' : '人员详情';
+        title.textContent = '编辑人员';
         
         // 填充表单
         document.getElementById('person-id').value = person.id || '';
@@ -1138,6 +1238,21 @@ class ZupuApp {
             spouse_of: personData.name
         };
         this.openPersonModal(spouseObj, false);
+    },
+
+    /**
+     * 四方向关系入口：管理员添加关系人
+     */
+    onAddRelation(personId, personName, relation) {
+        let title = '';
+        switch (relation) {
+            case 'father':  title = `为「${personName}」添加父亲`; break;
+            case 'child':   title = `为「${personName}」添加子女`; break;
+            case 'spouse':  title = `为「${personName}」添加配偶`; break;
+            case 'sibling': title = `为「${personName}」添加兄弟（同父）`; break;
+        }
+        this.showToast(`${title} — (功能开发中...)`);
+        // TODO: 后续可打开添加人员表单，并预填 father_id 等关联字段
     },
 
     /**
