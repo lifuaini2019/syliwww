@@ -11,6 +11,7 @@ class ZupuApp {
         this.peopleDict = {};
         this.treeZoomLevel = 100;
         this.baotaZoomLevel = 100;
+        this.showBefore17th = true;  // 新增：控制显示17世前
         
         this.treePinchState = { active: false, initialDistance: 0, initialZoom: 100 };
         this.baotaPinchState = { active: false, initialDistance: 0, initialZoom: 100 };
@@ -37,7 +38,21 @@ class ZupuApp {
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => this.bindEvents());
             return;
+       /**
+     * 加载宝塔树
+     */
+    async loadBaota() {
+        try {
+            const result = await api.getPeople();
+            if (result.status === 'success') {
+                // 应用世代过滤
+                const filteredPeople = this.applyGenerationFilter(result.data);
+                this.renderBaota(filteredPeople);
+            }
+        } catch (error) {
+            console.error('加载宝塔树失败:', error);
         }
+    }
 
         // 登录按钮事件
         const loginBtn = document.getElementById('login-btn');
@@ -97,15 +112,17 @@ class ZupuApp {
             this.openAddPersonModal();
         });
 
-        // 世系图缩放
+        // 绑定缩放按钮事件
         document.getElementById('tree-zoom-in')?.addEventListener('click', () => this.zoomTree(10));
         document.getElementById('tree-zoom-out')?.addEventListener('click', () => this.zoomTree(-10));
         document.getElementById('tree-reset')?.addEventListener('click', () => this.resetTreeZoom());
-
-        // 宝塔树缩放
+        
         document.getElementById('baota-zoom-in')?.addEventListener('click', () => this.zoomBaota(10));
         document.getElementById('baota-zoom-out')?.addEventListener('click', () => this.zoomBaota(-10));
         document.getElementById('baota-reset')?.addEventListener('click', () => this.resetBaotaZoom());
+        
+        // 绑定隐藏/显示17世前按钮
+        document.getElementById('baota-toggle-17th')?.addEventListener('click', () => this.toggleShowBefore17th());
 
         // 世系图双指缩放
         const treeContainer = document.getElementById('tree-container');
@@ -1016,16 +1033,35 @@ class ZupuApp {
     }
 
     /**
-     * 加载宝塔树
+     * 应用世代过滤
      */
-    async loadBaota() {
-        try {
-            const result = await api.getPeople();
-            if (result.status === 'success') {
-                this.renderBaota(result.data);
-            }
-        } catch (error) {
-            console.error('加载宝塔树失败:', error);
+    applyGenerationFilter(people) {
+        if (this.showBefore17th) {
+            return people; // 显示全部
+        }
+        
+        // 隐藏17世前的人员（世代数小于17）
+        return people.filter(p => {
+            const generation = parseInt(p.shi_xi) || 0;
+            return generation >= 17;
+        });
+    }
+
+    /**
+     * 切换显示/隐藏17世前
+     */
+    toggleShowBefore17th() {
+        this.showBefore17th = !this.showBefore17th;
+        
+        // 更新按钮文本
+        const button = document.getElementById('baota-toggle-17th');
+        if (button) {
+            button.textContent = this.showBefore17th ? '隐藏17世前' : '显示17世前';
+        }
+        
+        // 重新渲染宝塔树
+        if (this.currentPage === 'baota') {
+            this.loadBaota();
         }
     }
 
