@@ -534,7 +534,7 @@ class ZupuApp {
                     <td>${person.gender}</td>
                     <td>${person.generation || ''}</td>
                     <td>${person.shi_xi ? '第' + person.shi_xi + '世' : ''}</td>
-                    <td>${person.birth_date || ''}</td>
+                    <td>${person.birth_date || '不详'}</td>
                     <td>${person.death_date ? '已逝' : '健在'}</td>
                     <td>${fatherName}</td>
                     <td class="actions">
@@ -773,7 +773,7 @@ class ZupuApp {
                     </div>
                     <div class="vc-grid">
                         <div class="vc-item"><span class="vc-lbl">别名</span><span class="vc-val">${person.alias || '-'}</span></div>
-                        <div class="vc-item"><span class="vc-lbl">生日</span><span class="vc-val">${person.birth_date || '-'}</span></div>
+                        <div class="vc-item"><span class="vc-lbl">生日</span><span class="vc-val">${person.birth_date ? person.birth_date : '不详'}</span></div>
                     </div>
                     
                     ${hasSpouse ? `<div class="vc-extra"><span class="vc-lbl">配偶</span><span class="vc-val spouse-color">${person.spouse_name}</span></div>` : ''}
@@ -823,10 +823,25 @@ class ZupuApp {
         document.getElementById('person-alive').checked = person.death_date ? false : (person.is_alive !== undefined ? person.is_alive : true);
         document.getElementById('person-married').checked = person.is_married !== undefined ? person.is_married : true;
         document.getElementById('person-adopted').checked = person.is_adopted !== undefined ? person.is_adopted : false;
-        document.getElementById('person-death-date').value = person.death_date || '';
+        // 设置日期选择器状态
+        if (person.death_date) {
+            document.getElementById('person-death-combo').value = 'date';
+            document.getElementById('person-death-date').value = person.death_date;
+        } else {
+            document.getElementById('person-death-combo').value = '';
+            document.getElementById('person-death-date').value = '';
+        }
+        
+        if (person.birth_date) {
+            document.getElementById('person-birth-combo').value = 'date';
+            document.getElementById('person-birth-date').value = person.birth_date;
+        } else {
+            document.getElementById('person-birth-combo').value = '';
+            document.getElementById('person-birth-date').value = '';
+        }
+        
         document.getElementById('person-generation').value = person.generation || '';
         document.getElementById('person-shi-xi').value = person.shi_xi || '';
-        document.getElementById('person-birth-date').value = person.birth_date || '';
         document.getElementById('person-birth-calendar').value = person.birth_calendar || '公历';
         document.getElementById('person-ranking').value = person.ranking || '';
         document.getElementById('person-birth-place').value = person.birth_place || '';
@@ -912,13 +927,13 @@ class ZupuApp {
             phone: document.getElementById('person-phone').value,
             gender: document.getElementById('person-gender').value,
             is_alive: isAlive ? 1 : 0,
-            death_date: isAlive ? '' : document.getElementById('person-death-date').value,
+            death_date: isAlive ? '' : (document.getElementById('person-death-combo').value === 'date' ? document.getElementById('person-death-date').value : ''),
             is_married: document.getElementById('person-married').checked ? 1 : 0,
             is_adopted: document.getElementById('person-adopted').checked ? 1 : 0,
             adopt_father_id: document.getElementById('adopt-father-combo').value || '',
             generation: document.getElementById('person-generation').value,
             shi_xi: document.getElementById('person-shi-xi').value,
-            birth_date: document.getElementById('person-birth-date').value,
+            birth_date: document.getElementById('person-birth-combo').value === 'date' ? document.getElementById('person-birth-date').value : '',
             birth_calendar: document.getElementById('person-birth-calendar').value,
             father_id: document.getElementById('person-father').value || null,
             ranking: document.getElementById('person-ranking').value,
@@ -990,13 +1005,53 @@ class ZupuApp {
      */
     onAliveChanged(checked) {
         const deathDateInput = document.getElementById('person-death-date');
-        if (deathDateInput) {
+        const deathCombo = document.getElementById('person-death-combo');
+        if (deathDateInput && deathCombo) {
             const formGroup = deathDateInput.closest('.form-group');
             if (formGroup) {
                 formGroup.style.display = checked ? 'block' : 'block';
             }
-            deathDateInput.disabled = checked;
+            deathDateInput.disabled = checked || deathCombo.value !== 'date';
             if (checked) {
+                deathDateInput.value = '';
+                deathCombo.value = '';
+            }
+        }
+    }
+    
+    /**
+     * 出生日期选择改变
+     */
+    onBirthDateComboChanged() {
+        const birthCombo = document.getElementById('person-birth-combo');
+        const birthDateInput = document.getElementById('person-birth-date');
+        const birthCalendar = document.getElementById('person-birth-calendar');
+        
+        if (birthCombo && birthDateInput && birthCalendar) {
+            if (birthCombo.value === 'date') {
+                birthDateInput.disabled = false;
+                birthCalendar.disabled = false;
+            } else {
+                birthDateInput.disabled = true;
+                birthCalendar.disabled = true;
+                birthDateInput.value = '';
+            }
+        }
+    }
+    
+    /**
+     * 去世日期选择改变
+     */
+    onDeathDateComboChanged() {
+        const deathCombo = document.getElementById('person-death-combo');
+        const deathDateInput = document.getElementById('person-death-date');
+        const isAlive = document.getElementById('person-alive').checked;
+        
+        if (deathCombo && deathDateInput) {
+            if (deathCombo.value === 'date' && !isAlive) {
+                deathDateInput.disabled = false;
+            } else {
+                deathDateInput.disabled = true;
                 deathDateInput.value = '';
             }
         }
