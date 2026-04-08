@@ -3,41 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>上院李氏宗谱管理系统</title>
+    <title>上院李十七世族谱</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div id="app">
-        <!-- 登录页面 -->
         <div id="login-page" class="page">
             <div class="login-container">
                 <div class="login-header">
-                    <h1>上院李氏宗谱管理系统</h1>
+                    <div class="logo-icon"><i class="fas fa-book"></i></div>
+                    <h1>上院李十七世族谱</h1>
                     <p>家族传承 · 世代相传</p>
                 </div>
                 <div class="login-form">
                     <div class="form-group">
                         <label><i class="fas fa-user"></i> 账号</label>
-                        <input type="text" id="login-username" placeholder="请输入帐号">
+                        <input type="text" id="login-username" placeholder="请输入手机号或用户名">
                     </div>
                     <div class="form-group">
                         <label><i class="fas fa-lock"></i> 密码</label>
                         <input type="password" id="login-password" placeholder="请输入密码">
                     </div>
-                    <button id="login-btn" class="btn btn-primary">
+                    <button id="login-btn" class="btn btn-primary btn-block">
                         <i class="fas fa-sign-in-alt"></i> 登录
                     </button>
-                    <button id="guest-btn" class="btn" style="margin-top: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; width: 100%; padding: 12px; font-size: 16px;">
+                    <button id="guest-btn" class="btn btn-guest btn-block">
                         <i class="fas fa-eye"></i> 游客预览
                     </button>
+                    <div class="login-hint">
+                        <small>初始密码为手机号后6位</small>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- 主页面 -->
         <div id="main-page" class="page hidden">
-            <!-- 顶部导航 -->
             <header class="header">
                 <div class="header-left">
                     <button id="menu-toggle" class="menu-btn">
@@ -46,22 +47,22 @@
                     <h1 class="header-title">上院李十七世族谱</h1>
                 </div>
                 <div class="header-right">
-                    <span id="user-info"></span>
-                    <button id="logout-btn" class="btn btn-small">
+                    <span id="user-info"><i class="fas fa-user"></i> <span id="username-display"></span></span>
+                    <button id="logout-btn" class="btn btn-small btn-outline">
                         <i class="fas fa-sign-out-alt"></i> 退出
                     </button>
                 </div>
             </header>
 
-            <!-- 侧边栏菜单 -->
             <nav id="sidebar" class="sidebar">
                 <div class="sidebar-header">
                     <h3>功能菜单</h3>
+                    <button id="sidebar-close" class="sidebar-close"><i class="fas fa-times"></i></button>
                 </div>
                 <ul class="menu-list">
                     <li class="menu-item active" data-page="overview">
                         <i class="fas fa-home"></i>
-                        <span>族谱总览</span>
+                        <span>族谱首页</span>
                     </li>
                     <li class="menu-item" data-page="people">
                         <i class="fas fa-users"></i>
@@ -73,245 +74,300 @@
                     </li>
                     <li class="menu-item" data-page="baota">
                         <i class="fas fa-tree"></i>
-                        <span>宝塔树形体</span>
+                        <span>宝塔树</span>
                     </li>
-                    <li class="menu-item admin-only" data-page="import">
+                    <li class="menu-item" data-page="generation">
+                        <i class="fas fa-layer-group"></i>
+                        <span>世代视图</span>
+                    </li>
+                    <li class="menu-item" data-page="stats">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>统计分析</span>
+                    </li>
+                    <li class="menu-item admin-only hidden" data-page="users">
+                        <i class="fas fa-user-shield"></i>
+                        <span>帐号管理</span>
+                    </li>
+                    <li class="menu-item admin-only hidden" data-page="import">
                         <i class="fas fa-file-import"></i>
                         <span>导入导出</span>
                     </li>
-                    <li class="menu-item admin-only" data-page="photos">
-                        <i class="fas fa-images"></i>
-                        <span>照片管理</span>
-                    </li>
-                    <li class="menu-item admin-only" data-page="backup">
+                    <li class="menu-item admin-only hidden" data-page="backup">
                         <i class="fas fa-database"></i>
                         <span>数据备份</span>
                     </li>
-                    <li class="menu-item admin-only" data-page="permission">
-                        <i class="fas fa-user-shield"></i>
-                        <span>权限管理</span>
+                    <li class="menu-item" data-page="photos">
+                        <i class="fas fa-images"></i>
+                        <span>照片管理</span>
                     </li>
                 </ul>
             </nav>
 
-            <!-- 遮罩层 -->
             <div id="overlay" class="overlay"></div>
 
-            <!-- 内容区域 -->
             <main class="main-content">
-                <!-- 族谱总览 -->
-                <section id="overview-section" class="content-section active">
-                    <div class="section-header">
-                        <h2><i class="fas fa-home"></i> 族谱总览</h2>
-                    </div>
+                <div id="overview-section" class="content-section">
                     <div class="stats-grid">
                         <div class="stat-card">
-                            <i class="fas fa-users"></i>
+                            <div class="stat-icon blue"><i class="fas fa-users"></i></div>
                             <div class="stat-info">
-                                <h3 id="total-people">0</h3>
-                                <p>总人数</p>
+                                <div class="stat-value" id="stat-total">0</div>
+                                <div class="stat-label">总人数</div>
                             </div>
                         </div>
                         <div class="stat-card">
-                            <i class="fas fa-male"></i>
+                            <div class="stat-icon green"><i class="fas fa-male"></i></div>
                             <div class="stat-info">
-                                <h3 id="male-count">0</h3>
-                                <p>男性</p>
+                                <div class="stat-value" id="stat-male">0</div>
+                                <div class="stat-label">男丁</div>
                             </div>
                         </div>
                         <div class="stat-card">
-                            <i class="fas fa-female"></i>
+                            <div class="stat-icon pink"><i class="fas fa-female"></i></div>
                             <div class="stat-info">
-                                <h3 id="female-count">0</h3>
-                                <p>女性</p>
+                                <div class="stat-value" id="stat-female">0</div>
+                                <div class="stat-label">女性</div>
                             </div>
                         </div>
                         <div class="stat-card">
-                            <i class="fas fa-layer-group"></i>
+                            <div class="stat-icon orange"><i class="fas fa-layer-group"></i></div>
                             <div class="stat-info">
-                                <h3 id="generation-count">0</h3>
-                                <p>世代数</p>
+                                <div class="stat-value" id="stat-gen">0</div>
+                                <div class="stat-label">世系</div>
                             </div>
                         </div>
                     </div>
-                    <div class="recent-updates">
-                        <h3><i class="fas fa-clock"></i> 最近更新</h3>
-                        <div id="recent-list" class="recent-list"></div>
-                    </div>
-                </section>
 
-                <!-- 人员管理 -->
-                <section id="people-section" class="content-section">
-                    <div class="section-header">
-                        <h2><i class="fas fa-users"></i> 人员管理</h2>
-                        <div class="section-actions">
-                            <input type="text" id="people-search" class="search-input" placeholder="搜索姓名...">
-                            <button id="add-person-btn" class="btn btn-primary admin-only">
+                    <div class="card mt-20">
+                        <h3><i class="fas fa-star"></i> 17世后统计</h3>
+                        <div class="after17-stats">
+                            <div class="stat-item"><span>17世后男丁：</span><b id="after17-male">0</b>人</div>
+                            <div class="stat-item"><span>健在男丁：</span><b id="after17-alive">0</b>人</div>
+                            <div class="stat-item"><span>未婚男丁：</span><b id="after17-unmarried">0</b>人</div>
+                            <div class="stat-item"><span>健在世系：</span><b id="after17-gens">0</b>世</div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-20">
+                        <h3><i class="fas fa-user-plus"></i> 最近添加</h3>
+                        <div id="recent-people-list" class="recent-list"></div>
+                    </div>
+                </div>
+
+                <div id="people-section" class="content-section hidden">
+                    <div class="section-toolbar">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="people-search" placeholder="搜索姓名、手机号...">
+                        </div>
+                        <div class="toolbar-actions">
+                            <select id="people-filter" class="filter-select">
+                                <option value="">全部</option>
+                                <option value="alive">健在</option>
+                                <option value="deceased">去世</option>
+                                <option value="married">已婚</option>
+                                <option value="unmarried">未婚</option>
+                            </select>
+                            <button id="add-person-btn" class="btn btn-primary">
                                 <i class="fas fa-plus"></i> 添加人员
                             </button>
-                            <button id="refresh-people" class="btn btn-secondary">
-                                <i class="fas fa-sync"></i> 刷新
-                            </button>
                         </div>
                     </div>
-                    <div class="table-container">
-                        <table id="people-table" class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>头像</th>
-                                    <th>姓名</th>
-                                    <th>性别</th>
-                                    <th>字辈</th>
-                                    <th>世系</th>
-                                    <th>出生日期</th>
-                                    <th>状态</th>
-                                    <th>父亲</th>
-                                    <th>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="people-tbody"></tbody>
-                        </table>
-                    </div>
-                </section>
+                    <div class="people-list" id="people-list"></div>
+                    <div id="people-pagination" class="pagination"></div>
+                </div>
 
-                <!-- 世系图 -->
-                <section id="tree-section" class="content-section">
-                    <div class="section-header">
-                        <h2><i class="fas fa-sitemap"></i> 世系图</h2>
-                    </div>
-                    <div id="tree-container" class="tree-container">
-                        <div id="tree-canvas"></div>
-                    </div>
-                    <div class="zoom-controls" id="tree-zoom-controls">
-                        <button id="tree-zoom-in" class="zoom-btn"><i class="fas fa-plus"></i></button>
-                        <button id="tree-zoom-out" class="zoom-btn"><i class="fas fa-minus"></i></button>
-                        <button id="tree-reset" class="zoom-btn"><i class="fas fa-sync-alt"></i></button>
-                    </div>
-                </section>
-
-                <!-- 宝塔树形体 -->
-                <section id="baota-section" class="content-section">
-                    <div class="section-header">
-                        <h2><i class="fas fa-tree"></i> 宝塔树形体</h2>
-                    </div>
-                    <div id="baota-container" class="baota-container">
-                        <div id="baota-canvas"></div>
-                    </div>
-                    <div class="zoom-controls" id="baota-zoom-controls">
-                        <button id="baota-zoom-in" class="zoom-btn"><i class="fas fa-plus"></i></button>
-                        <button id="baota-zoom-out" class="zoom-btn"><i class="fas fa-minus"></i></button>
-                        <button id="baota-reset" class="zoom-btn"><i class="fas fa-sync-alt"></i></button>
-                        <button id="baota-toggle-17th" class="zoom-btn generation-toggle-btn">隐藏17世前</button>
-                    </div>
-                </section>
-
-                <!-- 导入导出 -->
-                <section id="import-section" class="content-section admin-section">
-                    <div class="section-header">
-                        <h2><i class="fas fa-file-import"></i> 导入导出</h2>
-                    </div>
-                    <div class="import-export-container">
-                        <div class="card">
-                            <h3><i class="fas fa-file-export"></i> 导出数据</h3>
-                            <p>将族谱数据导出为Excel文件</p>
-                            <button id="export-btn" class="btn btn-primary">
-                                <i class="fas fa-download"></i> 导出Excel
-                            </button>
+                <div id="tree-section" class="content-section hidden">
+                    <div class="view-toolbar">
+                        <div class="zoom-controls">
+                            <button class="btn btn-small" id="tree-zoom-out" title="缩小"><i class="fas fa-search-minus"></i></button>
+                            <span id="tree-zoom-level">100%</span>
+                            <button class="btn btn-small" id="tree-zoom-in" title="放大"><i class="fas fa-search-plus"></i></button>
+                            <button class="btn btn-small" id="tree-reset" title="重置"><i class="fas fa-redo"></i></button>
                         </div>
-                        <div class="card">
-                            <h3><i class="fas fa-file-import"></i> 导入数据</h3>
-                            <p>从Excel文件导入族谱数据</p>
-                            <input type="file" id="import-file" accept=".xlsx,.xls" class="hidden">
-                            <button id="import-btn" class="btn btn-primary">
-                                <i class="fas fa-upload"></i> 选择文件
-                            </button>
+                        <div class="tree-mode-toggle">
+                            <button class="btn btn-small active" id="tree-mode-vertical"><i class="fas fa-arrows-alt-v"></i> 纵向</button>
+                            <button class="btn btn-small" id="tree-mode-horizontal"><i class="fas fa-arrows-alt-h"></i> 横向</button>
+                        </div>
+                        <div class="tree-hint">提示：Ctrl+滚轮缩放，拖拽移动视图</div>
+                    </div>
+                    <div class="tree-layout">
+                        <div class="tree-container" id="tree-container">
+                            <div class="tree-canvas" id="tree-canvas"></div>
+                        </div>
+                        <div class="side-panel" id="tree-side-panel">
+                            <div class="side-panel-header">
+                                <h4><i class="fas fa-user"></i> 已选：<span id="selected-name">-</span></h4>
+                                <button class="btn btn-small btn-close-panel" id="close-tree-panel"><i class="fas fa-times"></i></button>
+                            </div>
+                            <div class="selected-info" id="selected-info"></div>
+                            <div class="action-buttons">
+                                <button class="btn btn-action" id="btn-add-father" disabled><i class="fas fa-user-plus"></i> 添加父亲</button>
+                                <button class="btn btn-action" id="btn-add-son" disabled><i class="fas fa-child"></i> 添加儿子</button>
+                                <button class="btn btn-action" id="btn-add-spouse" disabled><i class="fas fa-heart"></i> 添加配偶</button>
+                                <button class="btn btn-action" id="btn-add-sibling" disabled><i class="fas fa-user-friends"></i> 添加兄弟</button>
+                                <button class="btn btn-action btn-edit" id="btn-edit-person" disabled><i class="fas fa-edit"></i> 编辑本人</button>
+                            </div>
                         </div>
                     </div>
-                </section>
+                </div>
 
-                <!-- 照片管理 -->
-                <section id="photos-section" class="content-section admin-section">
-                    <div class="section-header">
-                        <h2><i class="fas fa-images"></i> 照片管理</h2>
-                        <div class="section-actions">
-                            <button id="upload-photo-btn" class="btn btn-primary">
-                                <i class="fas fa-upload"></i> 上传照片
-                            </button>
-                            <button id="refresh-photos" class="btn btn-secondary">
-                                <i class="fas fa-sync"></i> 刷新
-                            </button>
+                <div id="baota-section" class="content-section hidden">
+                    <div class="view-toolbar">
+                        <div class="zoom-controls">
+                            <button class="btn btn-small" id="baota-zoom-out" title="缩小"><i class="fas fa-search-minus"></i></button>
+                            <span id="baota-zoom-level">100%</span>
+                            <button class="btn btn-small" id="baota-zoom-in" title="放大"><i class="fas fa-search-plus"></i></button>
+                            <button class="btn btn-small" id="baota-reset" title="重置"><i class="fas fa-redo"></i></button>
+                        </div>
+                        <div class="baota-filter">
+                            <label><input type="checkbox" id="show-before-17" checked> 显示17世前</label>
+                        </div>
+                        <div class="tree-hint">提示：点击节点查看详情，拖拽移动视图</div>
+                    </div>
+                    <div class="tree-layout">
+                        <div class="tree-container" id="baota-container">
+                            <div class="baota-canvas" id="baota-canvas"></div>
+                        </div>
+                        <div class="side-panel" id="baota-side-panel">
+                            <div class="side-panel-header">
+                                <h4><i class="fas fa-user"></i> 已选：<span id="baota-selected-name">-</span></h4>
+                                <button class="btn btn-small btn-close-panel" id="close-baota-panel"><i class="fas fa-times"></i></button>
+                            </div>
+                            <div class="selected-info" id="baota-selected-info"></div>
+                            <div class="action-buttons">
+                                <button class="btn btn-action" id="baota-btn-add-father" disabled><i class="fas fa-user-plus"></i> 添加父亲</button>
+                                <button class="btn btn-action" id="baota-btn-add-son" disabled><i class="fas fa-child"></i> 添加儿子</button>
+                                <button class="btn btn-action" id="baota-btn-add-spouse" disabled><i class="fas fa-heart"></i> 添加配偶</button>
+                                <button class="btn btn-action" id="baota-btn-add-sibling" disabled><i class="fas fa-user-friends"></i> 添加兄弟</button>
+                                <button class="btn btn-action btn-edit" id="baota-btn-edit-person" disabled><i class="fas fa-edit"></i> 编辑本人</button>
+                            </div>
                         </div>
                     </div>
-                    <div id="photos-grid" class="photos-grid"></div>
-                </section>
+                </div>
 
-                <!-- 数据备份 -->
-                <section id="backup-section" class="content-section admin-section">
-                    <div class="section-header">
-                        <h2><i class="fas fa-database"></i> 数据备份</h2>
-                    </div>
-                    <div class="backup-container">
-                        <div class="card">
-                            <h3><i class="fas fa-save"></i> 创建备份</h3>
-                            <p>立即备份所有族谱数据</p>
-                            <button id="create-backup-btn" class="btn btn-primary">
-                                <i class="fas fa-plus"></i> 创建备份
-                            </button>
+                <div id="generation-section" class="content-section hidden">
+                    <div class="view-toolbar">
+                        <div class="gen-nav">
+                            <button class="btn btn-small" id="gen-prev"><i class="fas fa-chevron-left"></i> 上一世</button>
+                            <select id="gen-select" class="filter-select">
+                            </select>
+                            <button class="btn btn-small" id="gen-next">下一世 <i class="fas fa-chevron-right"></i></button>
                         </div>
-                        <div class="card">
-                            <h3><i class="fas fa-history"></i> 备份列表</h3>
-                            <div id="backup-list" class="backup-list"></div>
-                        </div>
+                        <div class="tree-hint">点击卡片查看详情或编辑</div>
                     </div>
-                </section>
+                    <div class="gen-grid" id="gen-grid"></div>
+                </div>
 
-                <!-- 权限管理 -->
-                <section id="permission-section" class="content-section admin-section">
-                    <div class="section-header">
-                        <h2><i class="fas fa-user-shield"></i> 权限管理</h2>
+                <div id="stats-section" class="content-section hidden">
+                    <div class="card">
+                        <h3><i class="fas fa-chart-pie"></i> 世代分布</h3>
+                        <div id="generation-stats" class="gen-stats-grid"></div>
+                    </div>
+                    <div class="card mt-20">
+                        <h3><i class="fas fa-venus-mars"></i> 性别比例</h3>
+                        <div class="gender-ratio">
+                            <div class="ratio-bar">
+                                <div class="ratio-male" id="ratio-male" style="width: 50%"></div>
+                                <div class="ratio-female" id="ratio-female" style="width: 50%"></div>
+                            </div>
+                            <div class="ratio-labels">
+                                <span><i class="fas fa-male"></i> 男 <span id="male-percent">50%</span></span>
+                                <span><i class="fas fa-female"></i> 女 <span id="female-percent">50%</span></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card mt-20">
+                        <h3><i class="fas fa-ring"></i> 婚姻状态</h3>
+                        <div class="marriage-stats">
+                            <div class="marriage-item"><span>已婚：</span><b id="married-count">0</b>人</div>
+                            <div class="marriage-item"><span>未婚：</span><b id="unmarried-count">0</b>人</div>
+                            <div class="marriage-item"><span>丧偶：</span><b id="widowed-count">0</b>人</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="users-section" class="content-section hidden">
+                    <div class="section-toolbar">
+                        <h3><i class="fas fa-user-shield"></i> 帐号管理</h3>
                         <button id="add-user-btn" class="btn btn-primary">
-                            <i class="fas fa-plus"></i> 添加用户
+                            <i class="fas fa-user-plus"></i> 添加账号
                         </button>
                     </div>
-                    <div class="table-container">
-                        <table id="users-table" class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>账号</th>
-                                    <th>角色</th>
-                                    <th>状态</th>
-                                    <th>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="users-tbody"></tbody>
-                        </table>
+                    <div class="card">
+                        <div id="users-list" class="users-list"></div>
                     </div>
-                </section>
+                </div>
+
+                <div id="import-section" class="content-section hidden">
+                    <div class="card">
+                        <h3><i class="fas fa-file-import"></i> 导入数据</h3>
+                        <div class="import-area">
+                            <input type="file" id="import-file" accept=".xlsx,.xls" style="display:none">
+                            <div class="import-actions">
+                                <button class="btn btn-primary" id="import-btn">
+                                    <i class="fas fa-upload"></i> 选择Excel文件导入
+                                </button>
+                                <button class="btn btn-outline" id="export-btn">
+                                    <i class="fas fa-download"></i> 导出Excel
+                                </button>
+                            </div>
+                            <div class="import-hint">
+                                <small>支持 .xlsx 和 .xls 格式，请确保Excel文件格式正确</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="backup-section" class="content-section hidden">
+                    <div class="card">
+                        <h3><i class="fas fa-database"></i> 数据备份</h3>
+                        <div class="backup-actions">
+                            <button class="btn btn-primary" id="backup-btn">
+                                <i class="fas fa-save"></i> 创建备份
+                            </button>
+                            <button class="btn btn-outline" id="restore-btn">
+                                <i class="fas fa-upload"></i> 恢复备份
+                            </button>
+                        </div>
+                        <div id="backup-list" class="backup-list"></div>
+                    </div>
+                </div>
+
+                <div id="photos-section" class="content-section hidden">
+                    <div class="section-toolbar">
+                        <h3><i class="fas fa-images"></i> 照片管理</h3>
+                        <button id="add-photo-btn" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> 上传照片
+                        </button>
+                    </div>
+                    <div class="photos-grid" id="photos-grid"></div>
+                </div>
             </main>
         </div>
 
-        <!-- 人员详情/编辑弹窗 -->
         <div id="person-modal" class="modal hidden">
-            <div class="modal-content">
+            <div class="modal-content modal-large">
                 <div class="modal-header">
-                    <h3 id="person-modal-title">人员详情</h3>
+                    <h3 id="person-modal-title">添加人员</h3>
                     <button class="modal-close">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <form id="person-form">
-                        <input type="hidden" id="person-id">
+                    <input type="hidden" id="person-id">
+                    <input type="hidden" id="person-relation">
+                    <input type="hidden" id="person-target-id">
+                    
+                    <div class="tabs">
+                        <button class="tab-btn active" data-tab="basic"><i class="fas fa-user"></i> 基本信息</button>
+                        <button class="tab-btn" data-tab="spouse"><i class="fas fa-heart"></i> 配偶信息</button>
+                    </div>
+                    
+                    <div class="tab-content active" id="tab-basic">
                         <div class="form-row">
                             <div class="form-group">
-                                <label>姓名</label>
-                                <input type="text" id="person-name" required>
+                                <label>姓名 <span class="required">*</span></label>
+                                <input type="text" id="person-name" required placeholder="请输入姓名">
                             </div>
-                            <div class="form-group">
-                                <label>别名</label>
-                                <input type="text" id="person-alias" placeholder="请输入别名">
-                            </div>
-                        </div>
-                        <div class="form-row">
                             <div class="form-group">
                                 <label>性别</label>
                                 <select id="person-gender">
@@ -319,184 +375,188 @@
                                     <option value="女">女</option>
                                 </select>
                             </div>
-                            <div class="form-group">
-                                <label>手机号</label>
-                                <input type="text" id="person-phone" placeholder="作为登录账号">
-                            </div>
-                        </div>
-                        
-                        <!-- ═══════ 三个重要状态钩选（独立分组，明显区分）═══════ -->
-                        <div class="status-group">
-                            <h3 class="status-group-title">📋 人员状态</h3>
-                            
-                            <!-- 是否健在（绿色主题） -->
-                            <div class="status-item status-alive">
-                                <label class="status-label">是否健在</label>
-                                <input type="checkbox" id="person-alive" checked onchange="app.onAliveChanged()">
-                                <span class="status-text">健在</span>
-                            </div>
-                            
-                            <!-- 是否已婚（粉色主题） -->
-                            <div class="status-item status-married">
-                                <label class="status-label">是否已婚</label>
-                                <input type="checkbox" id="person-married" checked>
-                                <span class="status-text">已婚</span>
-                            </div>
-                            
-                            <!-- 是否过继 + 过继父亲选择（蓝色主题） -->
-                            <div class="status-item status-adopted">
-                                <label class="status-label">是否过继</label>
-                                <input type="checkbox" id="person-adopted" onchange="app.onAdoptedChanged()">
-                                <span class="status-text">过继</span>
-                                
-                                <!-- 过继父亲选择（默认隐藏） -->
-                                <div class="adopt-father-select" id="adopt-father-select" style="display: none;">
-                                    <label>过继父亲:</label>
-                                    <select id="adopt-father-combo">
-                                        <option value="">-- 请选择父亲 --</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>去世日期</label>
-                                <select id="person-death-combo" onchange="app.onDeathDateComboChanged()">
-                                    <option value="">不详</option>
-                                    <option value="date">选择日期</option>
-                                </select>
-                                <input type="date" id="person-death-date" min="1736-01-01" style="margin-left: 10px;">
-                            </div>
                         </div>
                         <div class="form-row">
+                            <div class="form-group">
+                                <label>手机</label>
+                                <input type="text" id="person-phone" placeholder="请输入手机号">
+                            </div>
                             <div class="form-group">
                                 <label>字辈</label>
-                                <input type="text" id="person-generation">
-                            </div>
-                            <div class="form-group">
-                                <label>世系</label>
-                                <input type="number" id="person-shi-xi">
+                                <input type="text" id="person-generation" placeholder="如：十七世">
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label>出生日期</label>
-                                <select id="person-birth-combo" onchange="app.onBirthDateComboChanged()">
-                                    <option value="">不详</option>
-                                    <option value="date">选择日期</option>
-                                </select>
-                                <input type="date" id="person-birth-date" min="1736-01-01" style="margin-left: 10px;">
+                                <label>世系</label>
+                                <input type="number" id="person-shi-xi" placeholder="如：17">
                             </div>
                             <div class="form-group">
-                                <label>历法</label>
-                                <select id="person-birth-calendar">
-                                    <option value="公历">公历</option>
-                                    <option value="农历">农历</option>
+                                <label>排行</label>
+                                <select id="person-ranking">
+                                    <option value="">-- 选择排行 --</option>
+                                    <option value="老大">老大</option>
+                                    <option value="老二">老二</option>
+                                    <option value="老三">老三</option>
+                                    <option value="老四">老四</option>
+                                    <option value="老五">老五</option>
+                                    <option value="老六">老六</option>
+                                    <option value="老七">老七</option>
+                                    <option value="老八">老八</option>
+                                    <option value="老九">老九</option>
                                 </select>
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>父亲</label>
-                                <select id="person-father"></select>
+                                <select id="person-father">
+                                    <option value="">-- 选择父亲 --</option>
+                                </select>
                             </div>
                             <div class="form-group">
-                                <label>排行</label>
-                                <input type="text" id="person-ranking">
+                                <label>配偶</label>
+                                <select id="person-spouse">
+                                    <option value="">-- 选择配偶 --</option>
+                                </select>
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <label>头像</label>
-                            <div class="avatar-upload">
-                                <img id="person-avatar-preview" src="" alt="头像预览">
-                                <button type="button" id="select-avatar-btn" class="btn btn-secondary">
-                                    <i class="fas fa-image"></i> 选择头像
-                                </button>
-                            </div>
-                            <input type="hidden" id="person-avatar">
                         </div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label>籍贯</label>
-                                <input type="text" id="person-birth-place" placeholder="请输入籍贯">
+                                <label>出生日期</label>
+                                <input type="date" id="person-birth-date">
                             </div>
                             <div class="form-group">
-                                <label>现居地</label>
-                                <input type="text" id="person-live-place" placeholder="请输入现居地">
+                                <label>去世日期</label>
+                                <input type="date" id="person-death-date">
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <label>迁出记录</label>
-                            <textarea id="person-move-info" rows="2" placeholder="请输入迁出记录"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label>备注</label>
-                            <textarea id="person-remark" rows="2" placeholder="请输入备注"></textarea>
                         </div>
                         <div class="form-row">
-                            <div class="form-group">
-                                <label>排序</label>
-                                <input type="text" id="person-sort" placeholder="排序数字">
+                            <div class="form-group checkbox-group">
+                                <label><input type="checkbox" id="person-alive" checked> 健在</label>
+                            </div>
+                            <div class="form-group checkbox-group">
+                                <label><input type="checkbox" id="person-married"> 已婚</label>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>生平简介</label>
-                            <textarea id="person-bio" rows="3"></textarea>
+                            <label>籍贯/出生地</label>
+                            <input type="text" id="person-birth-place" placeholder="请输入籍贯或出生地">
                         </div>
-                        
-                        <!-- 配偶信息 -->
+                        <div class="form-group">
+                            <label>现居地</label>
+                            <input type="text" id="person-live-place" placeholder="请输入现居地">
+                        </div>
+                        <div class="form-group">
+                            <label>个人简介</label>
+                            <textarea id="person-bio" rows="3" placeholder="请输入个人简介（选填）"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-content" id="tab-spouse">
                         <div class="form-group">
                             <label>配偶姓名</label>
                             <input type="text" id="person-spouse-name" placeholder="请输入配偶姓名">
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>配偶手机</label>
-                                <input type="text" id="person-spouse-phone" placeholder="请输入配偶手机号">
-                            </div>
-                            <div class="form-group">
-                                <label>配偶生日</label>
-                                <input type="date" id="person-spouse-birth-date" min="1736-01-01">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>配偶历法</label>
-                                <select id="person-spouse-birth-calendar">
-                                    <option value="公历">公历</option>
-                                    <option value="农历">农历</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>配偶健在</label>
-                                <div style="display: flex; align-items: center; gap: 10px; height: 40px;">
-                                    <input type="checkbox" id="person-spouse-alive" checked>
-                                    <span>健在</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group" id="spouse-death-group">
-                            <label>配偶去世日期</label>
-                            <input type="date" id="person-spouse-death-date" min="1736-01-01">
+                        <div class="form-group">
+                            <label>配偶手机</label>
+                            <input type="text" id="person-spouse-phone" placeholder="请输入配偶手机号">
                         </div>
                         <div class="form-group">
-                            <label>配偶简介</label>
-                            <textarea id="person-spouse-bio" rows="3"></textarea>
+                            <label>配偶出生日期</label>
+                            <input type="date" id="person-spouse-birth-date">
                         </div>
-                    </form>
+                        <div class="form-group">
+                            <label>配偶籍贯</label>
+                            <input type="text" id="person-spouse-birth-place" placeholder="请输入配偶籍贯">
+                        </div>
+                        <div class="form-group">
+                            <label>配偶现居地</label>
+                            <input type="text" id="person-spouse-live-place" placeholder="请输入配偶现居地">
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary modal-close">取消</button>
-                    <button type="button" id="save-person-btn" class="btn btn-primary">保存</button>
+                    <button class="btn" id="person-cancel">取消</button>
+                    <button class="btn btn-primary" id="person-save">保存</button>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- 提示消息 -->
-    <div id="toast" class="toast hidden">
-        <span id="toast-message"></span>
+        <div id="user-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="user-modal-title">添加账号</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="user-id">
+                    <div class="form-group">
+                        <label>用户名 <span class="required">*</span></label>
+                        <input type="text" id="user-username" required placeholder="请输入用户名">
+                    </div>
+                    <div class="form-group">
+                        <label>手机号</label>
+                        <input type="text" id="user-phone" placeholder="请输入手机号">
+                    </div>
+                    <div class="form-group">
+                        <label>密码 <span class="required">*</span></label>
+                        <input type="password" id="user-password" placeholder="请输入密码">
+                    </div>
+                    <div class="form-group">
+                        <label>角色</label>
+                        <select id="user-role">
+                            <option value="admin">管理员</option>
+                            <option value="super">超级管理员</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" id="user-cancel">取消</button>
+                    <button class="btn btn-primary" id="user-save">保存</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="detail-modal" class="modal hidden">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h3 id="detail-modal-title">人员详情</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body" id="detail-content">
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline" id="detail-edit-btn"><i class="fas fa-edit"></i> 编辑</button>
+                    <button class="btn" id="detail-close-btn">关闭</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="confirm-modal" class="modal hidden">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h3 id="confirm-title">确认操作</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p id="confirm-message"></p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" id="confirm-cancel">取消</button>
+                    <button class="btn btn-danger" id="confirm-ok">确定</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="toast" class="toast hidden"></div>
+
+        <div id="loading" class="loading-overlay hidden">
+            <div class="loading-spinner">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>加载中...</span>
+            </div>
+        </div>
     </div>
 
     <script src="js/api.js"></script>
