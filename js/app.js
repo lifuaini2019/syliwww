@@ -686,8 +686,925 @@ class ZupuApp {
     }
 
     // ═══ 人员编辑 ═══
-    loadPersonEdit(params) {
-        showToast('人员编辑页开发中...', 'info');
+    // 编辑状态
+    _editState = {
+        id: '', isEdit: false, isSpouseMode: false, spousePersonId: '',
+        relation: '', targetId: '', targetName: '',
+        peopleList: [], fatherList: [], adoptFatherList: [],
+        otherImages: [], spouseOtherImages: [],
+        form: {
+            name: '', alias: '', phone: '', gender: '男',
+            is_alive: 1, death_date: '', death_calendar: '农历',
+            is_married: 1, is_adopted: 0, generation: '', shi_xi: '',
+            birth_date: '', birth_calendar: '农历', father_id: '',
+            spouse_of_id: '', ranking: '老大', birth_place: '',
+            live_place: '', move_info: '', remark: '', sort: '',
+            bio: '', avatar: '', other_image: '',
+            // 配偶字段
+            spouse_name: '', spouse_alias: '', spouse_phone: '',
+            spouse_gender: '女', spouse_avatar: '', spouse_other_image: '',
+            spouse_alive: 1, spouse_death_date: '', spouse_death_calendar: '农历',
+            spouse_birth_date: '', spouse_birth_calendar: '农历',
+            spouse_sort: '', spouse_birth_place: '', spouse_live_place: '',
+            spouse_move_info: '', spouse_remark: '', spouse_bio: '',
+        },
+        submitting: false, deathAgeHint: '', spouseDeathAgeHint: '',
+    };
+
+    async loadPersonEdit(params) {
+        if (!params) params = this._navParams || {};
+        const st = this._editState;
+        // 重置状态
+        st.id = ''; st.isEdit = false; st.isSpouseMode = false; st.spousePersonId = '';
+        st.relation = ''; st.targetId = ''; st.targetName = '';
+        st.otherImages = []; st.spouseOtherImages = [];
+        st.adoptFatherList = []; st.submitting = false;
+        st.deathAgeHint = ''; st.spouseDeathAgeHint = '';
+        // 重置form
+        Object.assign(st.form, {
+            name:'',alias:'',phone:'',gender:'男',is_alive:1,death_date:'',death_calendar:'农历',
+            is_married:1,is_adopted:0,generation:'',shi_xi:'',birth_date:'',birth_calendar:'农历',
+            father_id:'',spouse_of_id:'',ranking:'老大',birth_place:'',live_place:'',move_info:'',
+            remark:'',sort:'',bio:'',avatar:'',other_image:'',
+            spouse_name:'',spouse_alias:'',spouse_phone:'',spouse_gender:'女',spouse_avatar:'',
+            spouse_other_image:'',spouse_alive:1,spouse_death_date:'',spouse_death_calendar:'农历',
+            spouse_birth_date:'',spouse_birth_calendar:'农历',spouse_sort:'',spouse_birth_place:'',
+            spouse_live_place:'',spouse_move_info:'',spouse_remark:'',spouse_bio:'',
+        });
+
+        if (params.id) {
+            st.id = String(params.id);
+            st.isEdit = true;
+            if (params.editSpouse === '1' || params.editSpouse === true) st.isSpouseMode = true;
+            await this._loadEditData(st.id);
+        } else {
+            st.isEdit = false;
+            st.relation = params.relation || '';
+            st.targetId = params.targetId || '';
+            st.targetName = params.targetName ? decodeURIComponent(params.targetName) : '';
+            const isSpouseMode = st.relation === 'spouse';
+            st.isSpouseMode = isSpouseMode;
+            const father_id = params.father_id || '';
+            const gender = params.gender ? decodeURIComponent(params.gender) : '男';
+            const rankingText = params.rankingText ? decodeURIComponent(params.rankingText) : '';
+            const generation = params.generation ? decodeURIComponent(params.generation) : '';
+            let shi_xi = params.shi_xi ? decodeURIComponent(params.shi_xi) : '';
+            const spouseOfId = isSpouseMode ? st.targetId : '';
+            Object.assign(st.form, {
+                father_id: father_id || '', spouse_of_id: spouseOfId,
+                gender: isSpouseMode ? '女' : gender,
+                generation: isSpouseMode ? '' : generation,
+                shi_xi: isSpouseMode ? '' : shi_xi,
+                ranking: isSpouseMode ? '' : (rankingText || '老大'),
+                is_married: isSpouseMode ? 1 : 1,
+                spouse_gender: '女',
+            });
+            await this._loadEditPeopleList();
+            // 新增模式：字辈为空但有世系值时自动推送
+            if (!isSpouseMode && !st.form.generation && st.form.shi_xi) {
+                this._autoFillGeneration(st.form.shi_xi);
+            }
+        }
+        this._renderPersonEdit();
+    }
+
+    async _loadEditData(id) {
+        showLoading();
+        try {
+            const [personRes, peopleRes] = await Promise.all([api.getPerson(id), api.getPeople()]);
+            const st = this._editState;
+            let person = null;
+            if (personRes.status === 'success') {
+                person = personRes.data;
+                const isSpouseMode = st.isSpouseMode || !!(person.spouse_of_id);
+                const sp = person.spouse_person || {};
+                // 初始化表单默认值
+                let f = {
+                    name: person.name || '', alias: person.alias || '', phone: person.phone || '',
+                    gender: person.gender || '男',
+                    is_alive: person.is_alive !== undefined ? person.is_alive : (person.death_date ? 0 : 1),
+                    death_date: person.death_date || '', death_calendar: person.death_calendar || '农历',
+                    is_married: person.is_married !== undefined ? person.is_married : 1,
+                    is_adopted: person.is_adopted !== undefined ? person.is_adopted : 0,
+                    generation: person.generation || '', shi_xi: person.shi_xi || '',
+                    birth_date: person.birth_date || '', birth_calendar: person.birth_calendar || '农历',
+                    father_id: person.father_id || '', spouse_of_id: person.spouse_of_id || '',
+                    ranking: person.ranking || '老大', birth_place: person.birth_place || '',
+                    live_place: person.live_place || '', move_info: person.move_info || '',
+                    remark: person.remark || '', sort: person.sort || '',
+                    bio: person.bio || '', avatar: person.avatar || '', other_image: person.other_image || '',
+                    spouse_name: sp.name || person.spouse_name || '', spouse_alias: sp.alias || '',
+                    spouse_phone: sp.phone || person.spouse_phone || '', spouse_gender: sp.gender || '女',
+                    spouse_avatar: sp.avatar || person.spouse_avatar || '',
+                    spouse_other_image: sp.other_image || person.spouse_other_image || '',
+                    spouse_alive: sp.is_alive !== undefined ? sp.is_alive : (person.spouse_alive !== undefined ? person.spouse_alive : 1),
+                    spouse_death_date: sp.death_date || person.spouse_death_date || '',
+                    spouse_death_calendar: sp.death_calendar || '农历',
+                    spouse_birth_date: sp.birth_date || person.spouse_birth_date || '',
+                    spouse_birth_calendar: sp.birth_calendar || '农历',
+                    spouse_sort: sp.sort || '', spouse_birth_place: sp.birth_place || '',
+                    spouse_live_place: sp.live_place || '', spouse_move_info: sp.move_info || '',
+                    spouse_remark: sp.remark || '', spouse_bio: sp.bio || person.spouse_bio || '',
+                };
+                let spousePersonId = sp.id ? String(sp.id) : '';
+                let otherImages = [];
+                let spouseOtherImages = [];
+
+                if (isSpouseMode && person.spouse_of_id) {
+                    // 配偶自己的记录
+                    Object.assign(f, {
+                        spouse_name: person.name || '', spouse_alias: person.alias || '',
+                        spouse_phone: person.phone || '', spouse_gender: person.gender || '女',
+                        spouse_avatar: person.avatar || '', spouse_other_image: person.other_image || '',
+                        spouse_alive: person.is_alive !== undefined ? person.is_alive : 1,
+                        spouse_death_date: person.death_date || '', spouse_death_calendar: person.death_calendar || '农历',
+                        spouse_birth_date: person.birth_date || '', spouse_birth_calendar: person.birth_calendar || '农历',
+                        spouse_sort: person.sort || '', spouse_birth_place: person.birth_place || '',
+                        spouse_live_place: person.live_place || '', spouse_move_info: person.move_info || '',
+                        spouse_remark: person.remark || '', spouse_bio: person.bio || '',
+                    });
+                    spousePersonId = String(person.id);
+                    f.spouse_of_id = String(person.spouse_of_id);
+                    const spouseOImg = person.other_image || '';
+                    spouseOtherImages = spouseOImg ? spouseOImg.split(',').filter(s => s.trim()) : [];
+                    // 从 people 列表找户主信息填充主字段
+                    const peopleData = peopleRes.status === 'success' ? (peopleRes.data || []) : [];
+                    const houseOwner = peopleData.find(p => String(p.id) === String(person.spouse_of_id));
+                    if (houseOwner) {
+                        Object.assign(f, {
+                            name: houseOwner.name || '', alias: houseOwner.alias || '',
+                            phone: houseOwner.phone || '', gender: houseOwner.gender || '男',
+                            is_alive: houseOwner.is_alive !== undefined ? houseOwner.is_alive : 1,
+                            death_date: houseOwner.death_date || '', death_calendar: houseOwner.death_calendar || '农历',
+                            is_married: houseOwner.is_married !== undefined ? houseOwner.is_married : 1,
+                            is_adopted: houseOwner.is_adopted !== undefined ? houseOwner.is_adopted : 0,
+                            generation: houseOwner.generation || '', shi_xi: houseOwner.shi_xi || '',
+                            birth_date: houseOwner.birth_date || '', birth_calendar: houseOwner.birth_calendar || '农历',
+                            father_id: houseOwner.father_id || '', ranking: houseOwner.ranking || '老大',
+                            birth_place: houseOwner.birth_place || '', live_place: houseOwner.live_place || '',
+                            move_info: houseOwner.move_info || '', remark: houseOwner.remark || '',
+                            sort: houseOwner.sort || '', bio: houseOwner.bio || '',
+                            avatar: houseOwner.avatar || '', other_image: houseOwner.other_image || '',
+                        });
+                        const ownerOImg = houseOwner.other_image || '';
+                        otherImages = ownerOImg ? ownerOImg.split(',').filter(s => s.trim()) : [];
+                    }
+                } else {
+                    otherImages = (person.other_image || '') ? (person.other_image || '').split(',').filter(s => s.trim()) : [];
+                    const spouseOImg = sp.other_image || person.spouse_other_image || '';
+                    spouseOtherImages = spouseOImg ? spouseOImg.split(',').filter(s => s.trim()) : [];
+                }
+
+                st.form = f;
+                st.spousePersonId = spousePersonId;
+                st.isSpouseMode = isSpouseMode;
+                st.otherImages = otherImages;
+                st.spouseOtherImages = spouseOtherImages;
+                this._refreshDeathAgeHint();
+                this._refreshSpouseDeathAgeHint();
+
+                // 从 adopt_father_ids JSON 恢复继父列表
+                if (person.adopt_father_ids) {
+                    try {
+                        const ids = JSON.parse(person.adopt_father_ids);
+                        const allPeople = peopleRes.status === 'success' ? (peopleRes.data || []) : [];
+                        st.adoptFatherList = ids.map(aid => {
+                            const found = allPeople.find(p => String(p.id) === String(aid));
+                            return found ? { id: String(found.id), name: found.name, displayName: `${found.name}(${found.generation || '?'}世)` } : { id: String(aid), name: '', displayName: `ID:${aid}` };
+                        }).filter(item => item.id);
+                    } catch (e) { /* ignore */ }
+                }
+            }
+            if (peopleRes.status === 'success') {
+                st.peopleList = peopleRes.data || [];
+                this._loadFatherList();
+            }
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    async _loadEditPeopleList() {
+        try {
+            const res = await api.getPeople();
+            if (res.status === 'success') {
+                this._editState.peopleList = res.data || [];
+                this._loadFatherList();
+            }
+        } catch (e) { console.error('加载人员列表失败:', e); }
+    }
+
+    _loadFatherList() {
+        const st = this._editState;
+        const people = st.peopleList || [];
+        const myId = st.id;
+        const currentFatherId = st.form.father_id;
+        const currentFather = currentFatherId ? people.find(p => String(p.id) === String(currentFatherId)) : null;
+        const fatherShiXi = currentFather ? String(currentFather.shi_xi) : '';
+        const alreadySelectedIds = st.adoptFatherList.map(item => item.id).filter(id => id);
+        let filtered = people.filter(p => p.gender === '男');
+        if (fatherShiXi) filtered = filtered.filter(p => String(p.shi_xi) === fatherShiXi);
+        filtered = filtered.filter(p => String(p.id) !== String(myId));
+        filtered = filtered.filter(p => !alreadySelectedIds.includes(String(p.id)));
+        st.fatherList = filtered.map(p => ({ id: String(p.id), name: p.name, displayName: `${p.name}(${p.generation || '?'}世)` }));
+    }
+
+    async _autoFillGeneration(shiXi) {
+        try {
+            const res = await api.getGenerationNames();
+            if (res.status === 'success' && res.data) {
+                const found = res.data.find(item => String(item.shi_xi) === String(shiXi));
+                if (found && found.name && !this._editState.form.generation) {
+                    this._editState.form.generation = found.name;
+                    const el = document.getElementById('edit-generation');
+                    if (el) el.value = found.name;
+                }
+            }
+        } catch (e) { /* 静默 */ }
+    }
+
+    _calcDeathAge(birthDate, deathDate) {
+        if (!birthDate || !deathDate) return null;
+        const b = new Date(birthDate), d = new Date(deathDate);
+        if (isNaN(b.getTime()) || isNaN(d.getTime()) || d < b) return null;
+        let age = d.getFullYear() - b.getFullYear();
+        const m = d.getMonth() - b.getMonth();
+        if (m < 0 || (m === 0 && d.getDate() < b.getDate())) age -= 1;
+        return age >= 0 ? age : null;
+    }
+
+    _refreshDeathAgeHint() {
+        const f = this._editState.form;
+        if (Number(f.is_alive) !== 0) { this._editState.deathAgeHint = ''; return; }
+        const age = this._calcDeathAge(f.birth_date, f.death_date);
+        this._editState.deathAgeHint = age === null ? '' : `享年 ${age} 岁`;
+    }
+
+    _refreshSpouseDeathAgeHint() {
+        const f = this._editState.form;
+        if (Number(f.spouse_alive) !== 0) { this._editState.spouseDeathAgeHint = ''; return; }
+        const age = this._calcDeathAge(f.spouse_birth_date, f.spouse_death_date);
+        this._editState.spouseDeathAgeHint = age === null ? '' : `享年 ${age} 岁`;
+    }
+
+    _renderPersonEdit() {
+        const container = document.getElementById('person-edit-content');
+        if (!container) return;
+        const st = this._editState;
+        const f = st.form;
+        const isSM = st.isSpouseMode;
+        const rankingOptions = ['老大','老二','老三','老四','老五','老六','老七','老八','老九'];
+        const shiXiOptions = Array.from({length: 50}, (_, i) => String(i + 1));
+        const fatherList = st.fatherList || [];
+        const peopleList = st.peopleList || [];
+
+        const title = st.isEdit ? (isSM ? '编辑配偶' : '编辑人员') : (isSM ? '添加配偶' : '添加人员');
+        const avatarSrc = isSM ? f.spouse_avatar : f.avatar;
+        const aliveVal = isSM ? f.spouse_alive : f.is_alive;
+        const birthCal = isSM ? f.spouse_birth_calendar : f.birth_calendar;
+        const birthDate = isSM ? f.spouse_birth_date : f.birth_date;
+        const deathDate = isSM ? f.spouse_death_date : f.death_date;
+        const deathCal = isSM ? f.spouse_death_calendar : f.death_calendar;
+        const deathHint = isSM ? st.spouseDeathAgeHint : st.deathAgeHint;
+        const curImages = isSM ? st.spouseOtherImages : st.otherImages;
+
+        // 当前父亲名
+        const fatherPerson = f.father_id ? peopleList.find(p => String(p.id) === String(f.father_id)) : null;
+        const fatherName = fatherPerson ? fatherPerson.name : '请选择';
+
+        container.innerHTML = `
+        <div class="pe-back-bar">
+            <button class="btn btn-small btn-outline" onclick="app.navigateTo('people')"><i class="fas fa-arrow-left"></i> 返回</button>
+            <h3 class="pe-title">${title}</h3>
+            <span></span>
+        </div>
+        <div class="pe-scroll-content">
+            ${isSM ? `
+            <div class="pe-spouse-hint">
+                <span class="pe-hint-icon">💑</span>
+                <span class="pe-hint-text">配偶模式 — 只录入基础个人信息，不用世系/字辈/父亲/排行</span>
+            </div>` : ''}
+
+            <!-- 姓名+头像区 -->
+            <div class="pe-card pe-avatar-name-card">
+                <div class="pe-avatar-name-row">
+                    <div class="pe-avatar-box" onclick="app._editChooseAvatar('${isSM ? 'spouse_avatar' : 'avatar'}')">
+                        ${avatarSrc ? `<img src="${avatarSrc}" class="pe-avatar-img">` : `<div class="pe-avatar-placeholder"><span class="pe-avatar-icon">+</span><span class="pe-avatar-text">头像</span></div>`}
+                    </div>
+                    <div class="pe-name-fields">
+                        <div class="pe-name-row">
+                            <span class="pe-field-label">姓名：</span>
+                            <div class="pe-input-wrap pe-name-input-wrap">
+                                <input class="pe-input" type="text" id="edit-${isSM ? 'spouse_name' : 'name'}" placeholder="输入姓名" value="${isSM ? f.spouse_name : f.name}" oninput="app._editOnInput('${isSM ? 'spouse_name' : 'name'}', this.value)">
+                            </div>
+                            <div class="pe-gender-box" onclick="app._editToggleGender('${isSM ? 'spouse_gender' : 'gender'}')">${isSM ? f.spouse_gender : f.gender}</div>
+                        </div>
+                        <div class="pe-name-row">
+                            <span class="pe-field-label">别名：</span>
+                            <div class="pe-input-wrap">
+                                <input class="pe-input" type="text" id="edit-${isSM ? 'spouse_alias' : 'alias'}" placeholder="选填别名" value="${isSM ? f.spouse_alias : f.alias}" oninput="app._editOnInput('${isSM ? 'spouse_alias' : 'alias'}', this.value)">
+                            </div>
+                        </div>
+                        ${!isSM ? `
+                        <div class="pe-name-row">
+                            <span class="pe-field-label">字辈：</span>
+                            <div class="pe-input-wrap pe-gen-input-wrap">
+                                <input class="pe-input" type="text" id="edit-generation" placeholder="输入字辈" value="${f.generation}" oninput="app._editOnInput('generation', this.value)">
+                            </div>
+                            <span class="pe-shixi-label">世系：</span>
+                            <select class="pe-shixi-select" id="edit-shi_xi" onchange="app._editOnShiXiChange(this.value)">
+                                ${shiXiOptions.map((v, i) => `<option value="${v}" ${f.shi_xi === v ? 'selected' : ''}>${v}</option>`).join('')}
+                            </select>
+                        </div>` : ''}
+                    </div>
+                </div>
+                <div class="pe-phone-row">
+                    <span class="pe-field-label">手机：</span>
+                    <div class="pe-input-wrap">
+                        <input class="pe-input" type="text" id="edit-${isSM ? 'spouse_phone' : 'phone'}" placeholder="作为登录账号" value="${isSM ? f.spouse_phone : f.phone}" oninput="app._editOnInput('${isSM ? 'spouse_phone' : 'phone'}', this.value)">
+                    </div>
+                </div>
+            </div>
+
+            ${!isSM ? `
+            <!-- 排行+父亲+过继 -->
+            <div class="pe-card pe-triple-row">
+                <div class="pe-triple-item">
+                    <span class="pe-triple-label">排行</span>
+                    <select class="pe-triple-picker" id="edit-ranking" onchange="app._editOnInput('ranking', this.value)">
+                        ${rankingOptions.map(v => `<option value="${v}" ${f.ranking === v ? 'selected' : ''}>${v}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="pe-triple-item">
+                    <span class="pe-triple-label">父亲</span>
+                    <select class="pe-triple-picker" id="edit-father_id" onchange="app._editOnFatherChange(this.value)">
+                        <option value="">请选择</option>
+                        ${peopleList.map(p => `<option value="${p.id}" ${String(f.father_id) === String(p.id) ? 'selected' : ''}>${p.name}${p.generation ? '(' + p.generation + ')' : ''}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="pe-triple-item">
+                    <span class="pe-triple-label">过继</span>
+                    <label class="pe-switch"><input type="checkbox" id="edit-is_adopted" ${f.is_adopted ? 'checked' : ''} onchange="app._editOnAdoptedChange(this.checked)"><span class="pe-switch-slider"></span></label>
+                </div>
+            </div>
+
+            <!-- 继父列表 -->
+            ${f.is_adopted ? `
+            <div class="pe-card pe-adopt-section">
+                <div class="pe-section-header">继父列表：</div>
+                ${st.adoptFatherList.map((af, idx) => `
+                <div class="pe-adopt-row">
+                    <span class="pe-adopt-label">继父${idx + 1}：</span>
+                    <select class="pe-adopt-picker" onchange="app._editOnAdoptFatherSelect(${idx}, this.value)">
+                        <option value="">选择继父</option>
+                        ${fatherList.map(fp => `<option value="${fp.id}" ${af.id === fp.id ? 'selected' : ''}>${fp.displayName}</option>`).join('')}
+                    </select>
+                    <span class="pe-adopt-remove" onclick="app._editRemoveAdoptFather(${idx})">✕</span>
+                </div>`).join('')}
+                ${st.adoptFatherList.length < 3 ? `<div class="pe-adopt-add" onclick="app._editAddAdoptFather()">+ 添加继父</div>` : ''}
+            </div>` : ''}
+            ` : ''}
+
+            <!-- 健在开关+历法 -->
+            <div class="pe-card pe-status-row">
+                <div class="pe-alive-toggle">
+                    <span class="pe-alive-label">是否健在</span>
+                    <label class="pe-switch"><input type="checkbox" id="edit-${isSM ? 'spouse_alive' : 'is_alive'}" ${aliveVal ? 'checked' : ''} onchange="app._editOnAliveChange('${isSM ? 'spouse' : 'self'}', this.checked)"><span class="pe-switch-slider"></span></label>
+                    <span class="pe-alive-status">${aliveVal ? '健在' : '已故'}</span>
+                </div>
+                <div class="pe-calendar-select">
+                    <span class="pe-calendar-label">历法</span>
+                    <select class="pe-calendar-box" id="edit-${isSM ? 'spouse_birth_calendar' : 'birth_calendar'}" onchange="app._editOnInput('${isSM ? 'spouse_birth_calendar' : 'birth_calendar'}', this.value)">
+                        <option value="公历" ${birthCal === '公历' ? 'selected' : ''}>公历</option>
+                        <option value="农历" ${birthCal === '农历' ? 'selected' : ''}>农历</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 出生信息 -->
+            <div class="pe-card pe-birth-section">
+                <div class="pe-section-header">出生信息</div>
+                <div class="pe-date-row">
+                    <span class="pe-field-label">出生日期：</span>
+                    <input type="date" class="pe-date-input" id="edit-${isSM ? 'spouse_birth_date' : 'birth_date'}" value="${birthDate}" min="1736-01-01" onchange="app._editOnDateChange('${isSM ? 'spouse_birth_date' : 'birth_date'}', this.value)">
+                    <button class="pe-unknown-btn ${!birthDate ? 'pe-unknown-active' : ''}" onclick="app._editSetUnknown('${isSM ? 'spouse_birth_date' : 'birth_date'}')">不详</button>
+                </div>
+            </div>
+
+            <!-- 去世信息（健在关闭时显示） -->
+            ${!aliveVal ? `
+            <div class="pe-card pe-death-section">
+                <div class="pe-section-header">去世信息</div>
+                <div class="pe-date-row">
+                    <span class="pe-field-label">去世日期：</span>
+                    <input type="date" class="pe-date-input" id="edit-${isSM ? 'spouse_death_date' : 'death_date'}" value="${deathDate}" min="1736-01-01" onchange="app._editOnDateChange('${isSM ? 'spouse_death_date' : 'death_date'}', this.value)">
+                    <button class="pe-unknown-btn ${!deathDate ? 'pe-unknown-active' : ''}" onclick="app._editSetUnknown('${isSM ? 'spouse_death_date' : 'death_date'}')">不详</button>
+                </div>
+                ${deathHint ? `<div class="pe-death-age">${deathHint}</div>` : ''}
+            </div>` : ''}
+
+            <!-- 其他图片 -->
+            <div class="pe-card pe-other-image-section">
+                <div class="pe-section-header">其他图片信息</div>
+                <div class="pe-other-image-box">
+                    ${curImages.map((url, idx) => `
+                    <div class="pe-other-thumb-wrap">
+                        <img src="${url}" class="pe-other-thumb">
+                        <span class="pe-thumb-remove" onclick="app._editRemoveOtherImage('${isSM ? 'spouse' : 'self'}', ${idx})">×</span>
+                    </div>`).join('')}
+                    ${curImages.length < 3 ? `<div class="pe-other-add" onclick="app._editChooseOtherImage('${isSM ? 'spouse' : 'self'}')"><span class="pe-other-add-icon">+</span></div>` : ''}
+                </div>
+            </div>
+
+            <!-- 籍贯/排序/居住地 -->
+            <div class="pe-card pe-info-grid">
+                <div class="pe-info-row">
+                    <span class="pe-field-label">籍贯：</span>
+                    <div class="pe-input-wrap"><input class="pe-input" type="text" placeholder="请输入籍贯" value="${isSM ? f.spouse_birth_place : f.birth_place}" oninput="app._editOnInput('${isSM ? 'spouse_birth_place' : 'birth_place'}', this.value)"></div>
+                </div>
+                <div class="pe-info-row">
+                    <span class="pe-field-label">排序：</span>
+                    <div class="pe-input-wrap"><input class="pe-input" type="text" placeholder="排序" value="${isSM ? f.spouse_sort : f.sort}" oninput="app._editOnInput('${isSM ? 'spouse_sort' : 'sort'}', this.value)"></div>
+                </div>
+                <div class="pe-info-row">
+                    <span class="pe-field-label">居住：</span>
+                    <div class="pe-input-wrap"><input class="pe-input" type="text" placeholder="请输入居住地" value="${isSM ? f.spouse_live_place : f.live_place}" oninput="app._editOnInput('${isSM ? 'spouse_live_place' : 'live_place'}', this.value)"></div>
+                </div>
+            </div>
+
+            <!-- 生平简介 -->
+            <div class="pe-card pe-bio-section">
+                <div class="pe-section-header">生平简介：</div>
+                <textarea class="pe-textarea" placeholder="请输入生平简介" oninput="app._editOnInput('${isSM ? 'spouse_bio' : 'bio'}', this.value)">${isSM ? f.spouse_bio : f.bio}</textarea>
+            </div>
+
+            <!-- 详细地址 -->
+            <div class="pe-card pe-address-section">
+                <div class="pe-section-header">详细地址：</div>
+                <textarea class="pe-textarea pe-textarea-sm" placeholder="请输入详细地址" oninput="app._editOnInput('address', this.value)">${isSM ? '' : (f.address || '')}</textarea>
+            </div>
+
+            <!-- 备注 -->
+            <div class="pe-card pe-remark-section">
+                <div class="pe-section-header">备注：</div>
+                <textarea class="pe-textarea pe-textarea-sm" placeholder="请输入备注" oninput="app._editOnInput('${isSM ? 'spouse_remark' : 'remark'}', this.value)">${isSM ? f.spouse_remark : f.remark}</textarea>
+            </div>
+
+            ${isSM ? `
+            <div class="pe-card">
+                <div class="pe-info-row">
+                    <span class="pe-field-label">归属户主ID：</span>
+                    <input class="pe-input" type="text" value="${f.spouse_of_id}" disabled style="color:#999;">
+                </div>
+            </div>` : ''}
+
+            <!-- 启用配偶开关（底部，仅非配偶模式） -->
+            ${!isSM ? `
+            <div class="pe-bottom-area">
+                <div class="pe-spouse-toggle-row">
+                    <label class="pe-switch"><input type="checkbox" id="edit-is_married" ${f.is_married ? 'checked' : ''} ${f.gender === '女' ? 'disabled' : ''} onchange="app._editOnMarriedChange(this.checked)"><span class="pe-switch-slider"></span></label>
+                    <span class="pe-spouse-toggle-label ${f.gender === '女' ? 'pe-label-disabled' : ''}">💑 启用配偶信息</span>
+                    ${f.gender === '女' ? '<span class="pe-spouse-toggle-status">女儿不适用</span>' : `<span class="pe-spouse-toggle-status">${f.is_married ? '已启用' : '未启用'}</span>`}
+                </div>
+            </div>` : ''}
+
+            <!-- 配偶编辑面板 -->
+            ${!isSM && f.is_married ? this._renderSpousePanel() : ''}
+
+            <!-- 保存按钮 -->
+            <div class="pe-bottom-area">
+                <button class="pe-submit-btn" onclick="app._editOnSubmit()" ${st.submitting ? 'disabled' : ''}>
+                    ${st.submitting ? '提交中...' : (st.isEdit ? '保存修改' : '添加人员')}
+                </button>
+            </div>
+        </div>`;
+    }
+
+    _renderSpousePanel() {
+        const f = this._editState.form;
+        const st = this._editState;
+        const spouseImages = st.spouseOtherImages;
+        return `
+        <div class="pe-spouse-panel">
+            <div class="pe-spouse-divider">— 以下为配偶信息 —</div>
+
+            <!-- 配偶姓名+头像区 -->
+            <div class="pe-card pe-avatar-name-card pe-spouse-card">
+                <div class="pe-avatar-name-row">
+                    <div class="pe-avatar-box" onclick="app._editChooseAvatar('spouse_avatar')">
+                        ${f.spouse_avatar ? `<img src="${f.spouse_avatar}" class="pe-avatar-img">` : `<div class="pe-avatar-placeholder"><span class="pe-avatar-icon">+</span><span class="pe-avatar-text">头像</span></div>`}
+                    </div>
+                    <div class="pe-name-fields">
+                        <div class="pe-name-row">
+                            <span class="pe-field-label">姓名：</span>
+                            <div class="pe-input-wrap pe-name-input-wrap">
+                                <input class="pe-input" type="text" placeholder="配偶姓名" value="${f.spouse_name}" oninput="app._editOnInput('spouse_name', this.value)">
+                            </div>
+                            <div class="pe-gender-box" onclick="app._editToggleGender('spouse_gender')">${f.spouse_gender}</div>
+                        </div>
+                        <div class="pe-name-row">
+                            <span class="pe-field-label">别名：</span>
+                            <div class="pe-input-wrap">
+                                <input class="pe-input" type="text" placeholder="选填" value="${f.spouse_alias}" oninput="app._editOnInput('spouse_alias', this.value)">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="pe-phone-row">
+                    <span class="pe-field-label">手机：</span>
+                    <div class="pe-input-wrap">
+                        <input class="pe-input" type="text" placeholder="作为登录账号" value="${f.spouse_phone}" oninput="app._editOnInput('spouse_phone', this.value)">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 配偶健在+历法 -->
+            <div class="pe-card pe-status-row pe-spouse-card">
+                <div class="pe-alive-toggle">
+                    <span class="pe-alive-label">是否健在</span>
+                    <label class="pe-switch"><input type="checkbox" ${f.spouse_alive ? 'checked' : ''} onchange="app._editOnAliveChange('spouse', this.checked)"><span class="pe-switch-slider"></span></label>
+                    <span class="pe-alive-status">${f.spouse_alive ? '健在' : '已故'}</span>
+                </div>
+                <div class="pe-calendar-select">
+                    <span class="pe-calendar-label">历法</span>
+                    <select class="pe-calendar-box" onchange="app._editOnInput('spouse_birth_calendar', this.value)">
+                        <option value="公历" ${f.spouse_birth_calendar === '公历' ? 'selected' : ''}>公历</option>
+                        <option value="农历" ${f.spouse_birth_calendar === '农历' ? 'selected' : ''}>农历</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 配偶出生信息 -->
+            <div class="pe-card pe-birth-section pe-spouse-card">
+                <div class="pe-section-header">出生信息</div>
+                <div class="pe-date-row">
+                    <span class="pe-field-label">出生日期：</span>
+                    <input type="date" class="pe-date-input" value="${f.spouse_birth_date}" min="1736-01-01" onchange="app._editOnDateChange('spouse_birth_date', this.value)">
+                    <button class="pe-unknown-btn ${!f.spouse_birth_date ? 'pe-unknown-active' : ''}" onclick="app._editSetUnknown('spouse_birth_date')">不详</button>
+                </div>
+            </div>
+
+            <!-- 配偶去世信息 -->
+            ${!f.spouse_alive ? `
+            <div class="pe-card pe-death-section pe-spouse-card">
+                <div class="pe-section-header">去世信息</div>
+                <div class="pe-date-row">
+                    <span class="pe-field-label">去世日期：</span>
+                    <input type="date" class="pe-date-input" value="${f.spouse_death_date}" min="1736-01-01" onchange="app._editOnDateChange('spouse_death_date', this.value)">
+                    <button class="pe-unknown-btn ${!f.spouse_death_date ? 'pe-unknown-active' : ''}" onclick="app._editSetUnknown('spouse_death_date')">不详</button>
+                </div>
+                ${st.spouseDeathAgeHint ? `<div class="pe-death-age">${st.spouseDeathAgeHint}</div>` : ''}
+            </div>` : ''}
+
+            <!-- 配偶其他图片 -->
+            <div class="pe-card pe-other-image-section pe-spouse-card">
+                <div class="pe-section-header">其他图片信息</div>
+                <div class="pe-other-image-box">
+                    ${spouseImages.map((url, idx) => `
+                    <div class="pe-other-thumb-wrap">
+                        <img src="${url}" class="pe-other-thumb">
+                        <span class="pe-thumb-remove" onclick="app._editRemoveOtherImage('spouse', ${idx})">×</span>
+                    </div>`).join('')}
+                    ${spouseImages.length < 3 ? `<div class="pe-other-add" onclick="app._editChooseOtherImage('spouse')"><span class="pe-other-add-icon">+</span></div>` : ''}
+                </div>
+            </div>
+
+            <!-- 配偶籍贯/排序/居住地 -->
+            <div class="pe-card pe-info-grid pe-spouse-card">
+                <div class="pe-info-row">
+                    <span class="pe-field-label">籍贯：</span>
+                    <div class="pe-input-wrap"><input class="pe-input" type="text" placeholder="请输入" value="${f.spouse_birth_place}" oninput="app._editOnInput('spouse_birth_place', this.value)"></div>
+                </div>
+                <div class="pe-info-row">
+                    <span class="pe-field-label">排序：</span>
+                    <div class="pe-input-wrap"><input class="pe-input" type="text" placeholder="排序" value="${f.spouse_sort}" oninput="app._editOnInput('spouse_sort', this.value)"></div>
+                </div>
+                <div class="pe-info-row">
+                    <span class="pe-field-label">居住：</span>
+                    <div class="pe-input-wrap"><input class="pe-input" type="text" placeholder="请输入" value="${f.spouse_live_place}" oninput="app._editOnInput('spouse_live_place', this.value)"></div>
+                </div>
+            </div>
+
+            <!-- 配偶简介 -->
+            <div class="pe-card pe-bio-section pe-spouse-card">
+                <div class="pe-section-header">生平简介：</div>
+                <textarea class="pe-textarea" placeholder="请输入配偶简介" oninput="app._editOnInput('spouse_bio', this.value)">${f.spouse_bio}</textarea>
+            </div>
+
+            <!-- 配偶备注 -->
+            <div class="pe-card pe-remark-section pe-spouse-card">
+                <div class="pe-section-header">备注：</div>
+                <textarea class="pe-textarea pe-textarea-sm" placeholder="请输入备注" oninput="app._editOnInput('spouse_remark', this.value)">${f.spouse_remark}</textarea>
+            </div>
+        </div>`;
+    }
+
+    // ═══ 编辑页事件处理 ═══
+    _editOnInput(field, value) {
+        this._editState.form[field] = value;
+        // 输入姓名时自动推送字辈
+        if (field === 'name' && !this._editState.form.generation && this._editState.form.shi_xi && !this._editState.isSpouseMode) {
+            this._autoFillGeneration(this._editState.form.shi_xi);
+        }
+    }
+
+    _editToggleGender(field) {
+        const st = this._editState;
+        const cur = st.form[field];
+        st.form[field] = cur === '男' ? '女' : '男';
+        // 性别改为女时关闭配偶
+        if (field === 'gender' && st.form.gender === '女') {
+            st.form.is_married = 0;
+        }
+        this._renderPersonEdit();
+    }
+
+    _editOnShiXiChange(value) {
+        const st = this._editState;
+        st.form.shi_xi = value;
+        if (value && !st.isSpouseMode) {
+            this._autoFillGeneration(value);
+        }
+    }
+
+    _editOnFatherChange(fatherId) {
+        const st = this._editState;
+        const people = st.peopleList || [];
+        const father = fatherId ? people.find(p => String(p.id) === String(fatherId)) : null;
+        if (father && father.shi_xi) {
+            const fatherShiXi = parseInt(father.shi_xi) || 0;
+            if (fatherShiXi > 0) {
+                const calcShiXi = fatherShiXi + 1;
+                st.form.father_id = fatherId;
+                st.form.shi_xi = String(calcShiXi);
+                st.form.generation = '';
+                this._loadFatherList();
+                this._autoFillGeneration(String(calcShiXi));
+                this._renderPersonEdit();
+                return;
+            }
+        }
+        st.form.father_id = fatherId || '';
+        this._loadFatherList();
+        this._renderPersonEdit();
+    }
+
+    _editOnAdoptedChange(checked) {
+        this._editState.form.is_adopted = checked ? 1 : 0;
+        if (checked && this._editState.fatherList.length === 0) this._loadFatherList();
+        this._renderPersonEdit();
+    }
+
+    _editOnAdoptFatherSelect(idx, value) {
+        const st = this._editState;
+        const father = value ? st.fatherList.find(f => f.id === value) : null;
+        if (father) st.adoptFatherList[idx] = { id: father.id, name: father.name, displayName: father.displayName };
+        else st.adoptFatherList[idx] = { id: '', name: '', displayName: '' };
+        this._loadFatherList(); // 重新筛选排除已选
+    }
+
+    _editAddAdoptFather() {
+        const st = this._editState;
+        if (st.adoptFatherList.length >= 3) { showToast('最多3个继父', 'error'); return; }
+        st.adoptFatherList.push({ id: '', name: '', displayName: '' });
+        this._renderPersonEdit();
+    }
+
+    _editRemoveAdoptFather(idx) {
+        this._editState.adoptFatherList.splice(idx, 1);
+        this._loadFatherList();
+        this._renderPersonEdit();
+    }
+
+    _editOnAliveChange(who, checked) {
+        const st = this._editState;
+        const isAlive = checked ? 1 : 0;
+        if (who === 'spouse') {
+            st.form.spouse_alive = isAlive;
+            if (isAlive) st.form.spouse_death_date = '';
+            this._refreshSpouseDeathAgeHint();
+        } else {
+            st.form.is_alive = isAlive;
+            if (isAlive) st.form.death_date = '';
+            this._refreshDeathAgeHint();
+        }
+        this._renderPersonEdit();
+    }
+
+    _editOnDateChange(field, value) {
+        this._editState.form[field] = value;
+        if (field.includes('death') || field.includes('birth')) {
+            this._refreshDeathAgeHint();
+            this._refreshSpouseDeathAgeHint();
+            // 更新享年提示（局部更新而非全量渲染）
+            const hintEl = document.querySelector('.pe-death-age');
+            const hint = field.startsWith('spouse') ? this._editState.spouseDeathAgeHint : this._editState.deathAgeHint;
+            if (hintEl) hintEl.textContent = hint;
+        }
+    }
+
+    _editSetUnknown(field) {
+        this._editState.form[field] = '';
+        this._refreshDeathAgeHint();
+        this._refreshSpouseDeathAgeHint();
+        this._renderPersonEdit();
+        showToast('已设为不详', 'info');
+    }
+
+    _editOnMarriedChange(checked) {
+        const st = this._editState;
+        st.form.is_married = checked ? 1 : 0;
+        if (!checked) {
+            // 清空配偶数据
+            Object.assign(st.form, {
+                spouse_name:'', spouse_alias:'', spouse_phone:'', spouse_gender:'女',
+                spouse_avatar:'', spouse_other_image:'', spouse_alive:1,
+                spouse_death_date:'', spouse_death_calendar:'农历',
+                spouse_birth_date:'', spouse_birth_calendar:'农历',
+                spouse_sort:'', spouse_birth_place:'', spouse_live_place:'',
+                spouse_move_info:'', spouse_remark:'', spouse_bio:'',
+            });
+            st.spouseOtherImages = [];
+        }
+        this._renderPersonEdit();
+    }
+
+    _editChooseAvatar(type) {
+        const input = document.createElement('input');
+        input.type = 'file'; input.accept = 'image/*';
+        input.onchange = async (e) => {
+            const file = e.target.files[0]; if (!file) return;
+            showLoading();
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('type', type === 'spouse_avatar' || type === 'avatar' ? 'avatar' : 'avatars');
+                const res = await api.uploadFile(formData);
+                if (res.status === 'success' && res.url) {
+                    this._editState.form[type] = res.url;
+                    showToast('上传成功', 'success');
+                    this._renderPersonEdit();
+                } else showToast(res.message || '上传失败', 'error');
+            } catch (e) { showToast('上传失败', 'error'); }
+            finally { hideLoading(); }
+        };
+        input.click();
+    }
+
+    _editChooseOtherImage(who) {
+        const st = this._editState;
+        const curImages = who === 'spouse' ? st.spouseOtherImages : st.otherImages;
+        const remain = 3 - curImages.length;
+        if (remain <= 0) { showToast('最多3张图片', 'error'); return; }
+        const input = document.createElement('input');
+        input.type = 'file'; input.accept = 'image/*'; input.multiple = true;
+        input.onchange = async (e) => {
+            const files = Array.from(e.target.files).slice(0, remain);
+            for (const file of files) {
+                showLoading();
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('type', 'other');
+                    const res = await api.uploadFile(formData);
+                    if (res.status === 'success' && res.url) {
+                        if (who === 'spouse') st.spouseOtherImages.push(res.url);
+                        else st.otherImages.push(res.url);
+                    } else showToast(res.message || '上传失败', 'error');
+                } catch (e) { showToast('上传失败', 'error'); }
+                finally { hideLoading(); }
+            }
+            this._renderPersonEdit();
+        };
+        input.click();
+    }
+
+    _editRemoveOtherImage(who, idx) {
+        const st = this._editState;
+        if (who === 'spouse') st.spouseOtherImages.splice(idx, 1);
+        else st.otherImages.splice(idx, 1);
+        this._renderPersonEdit();
+    }
+
+    async _editOnSubmit() {
+        const st = this._editState;
+        const f = st.form;
+        const nameToCheck = st.isSpouseMode ? f.spouse_name : f.name;
+        if (!nameToCheck) { showToast('请输入姓名', 'error'); return; }
+        st.submitting = true;
+        this._renderPersonEdit(); // 显示"提交中..."
+
+        try {
+            // ═══ 配偶模式 ═══
+            if (st.isSpouseMode) {
+                const spouseData = {
+                    name: f.spouse_name || f.name, alias: f.spouse_alias || f.alias,
+                    phone: f.spouse_phone || f.phone,
+                    gender: f.spouse_gender || f.gender || '女',
+                    is_alive: Number(f.spouse_alive !== undefined ? f.spouse_alive : f.is_alive) || 0,
+                    death_date: f.spouse_death_date || f.death_date,
+                    death_calendar: f.spouse_death_calendar || f.death_calendar,
+                    is_married: 1, is_adopted: 0, generation: '', shi_xi: '',
+                    father_id: '', ranking: '',
+                    birth_date: f.spouse_birth_date || f.birth_date,
+                    birth_calendar: f.spouse_birth_calendar || f.birth_calendar,
+                    spouse_of_id: f.spouse_of_id,
+                    birth_place: f.spouse_birth_place || f.birth_place,
+                    live_place: f.spouse_live_place || f.live_place,
+                    move_info: f.spouse_move_info || f.move_info,
+                    remark: f.spouse_remark || f.remark,
+                    sort: f.spouse_sort || f.sort, bio: f.spouse_bio || f.bio,
+                    avatar: f.spouse_avatar || f.avatar,
+                    other_image: st.spouseOtherImages.join(',') || st.otherImages.join(','),
+                };
+                if (!spouseData.spouse_of_id && st.targetId) spouseData.spouse_of_id = String(st.targetId);
+                if (!spouseData.spouse_of_id && st.id) spouseData.spouse_of_id = String(st.id);
+
+                let result;
+                if (st.spousePersonId) result = await api.updatePerson(st.spousePersonId, spouseData);
+                else result = await api.addPerson(spouseData);
+                if (result.status !== 'success') { showToast(result.message || '操作失败', 'error'); return; }
+                showToast(st.isEdit ? '修改成功' : '添加成功', 'success');
+                setTimeout(() => this.navigateTo('people'), 1500);
+                return;
+            }
+
+            // ═══ 户主模式 ═══
+            const effectiveIsMarried = Number(f.is_married) || 0;
+            const hasSpouseName = !!(f.spouse_name && f.spouse_name.trim());
+            const finalIsMarried = hasSpouseName ? 1 : effectiveIsMarried;
+
+            const selfData = {
+                name: f.name, alias: f.alias, phone: f.phone, gender: f.gender,
+                is_alive: Number(f.is_alive) || 0, death_date: f.death_date,
+                death_calendar: f.death_calendar, is_married: finalIsMarried,
+                is_adopted: Number(f.is_adopted) || 0,
+                adopt_father_ids: JSON.stringify(st.adoptFatherList.map(item => item.id).filter(id => id)),
+                generation: f.generation, shi_xi: f.shi_xi,
+                birth_date: f.birth_date, birth_calendar: f.birth_calendar,
+                father_id: f.father_id, spouse_of_id: '', ranking: f.ranking,
+                birth_place: f.birth_place, live_place: f.live_place,
+                move_info: f.move_info, remark: f.remark, sort: f.sort,
+                bio: f.bio, avatar: f.avatar, other_image: st.otherImages.join(','),
+            };
+
+            if (finalIsMarried && f.spouse_name) {
+                selfData.spouse_data = {
+                    name: f.spouse_name, alias: f.spouse_alias, phone: f.spouse_phone,
+                    gender: f.spouse_gender || '女',
+                    is_alive: Number(f.spouse_alive) || 0,
+                    death_date: f.spouse_death_date, death_calendar: f.spouse_death_calendar,
+                    birth_date: f.spouse_birth_date, birth_calendar: f.spouse_birth_calendar,
+                    generation: '', shi_xi: '', father_id: '', ranking: '',
+                    birth_place: f.spouse_birth_place, live_place: f.spouse_live_place,
+                    move_info: f.spouse_move_info, remark: f.spouse_remark,
+                    sort: f.spouse_sort, bio: f.spouse_bio, avatar: f.spouse_avatar,
+                    other_image: st.spouseOtherImages.join(','),
+                    is_married: 1, is_adopted: 0,
+                };
+            }
+
+            let result;
+            if (st.isEdit) result = await api.updatePerson(st.id, selfData);
+            else result = await api.addPerson(selfData);
+
+            if (result.status !== 'success') { showToast(result.message || '操作失败', 'error'); return; }
+
+            // 添加父亲模式：自动更新儿子的 father_id
+            if (!st.isEdit && st.relation === 'father' && st.targetId) {
+                try {
+                    showLoading();
+                    const peopleRes = await api.getPeople();
+                    if (peopleRes.status === 'success' && peopleRes.data) {
+                        const allPeople = peopleRes.data;
+                        let matchedFather = allPeople.find(p => p.name === f.name && String(p.shi_xi) === String(f.shi_xi));
+                        if (!matchedFather && f.shi_xi) matchedFather = allPeople.find(p => p.name === f.name);
+                        if (matchedFather && matchedFather.id) {
+                            const sonRes = await api.getPerson(String(st.targetId));
+                            if (sonRes.status === 'success' && sonRes.data) {
+                                const sonData = sonRes.data;
+                                sonData.father_id = String(matchedFather.id);
+                                if (sonData.is_alive !== undefined) sonData.is_alive = Number(sonData.is_alive) || 0;
+                                if (sonData.is_married !== undefined) sonData.is_married = Number(sonData.is_married) || 0;
+                                if (sonData.is_adopted !== undefined) sonData.is_adopted = Number(sonData.is_adopted) || 0;
+                                await api.updatePerson(String(st.targetId), sonData);
+                                showToast(`成功！${f.name}已设为父亲`, 'success');
+                            }
+                        } else {
+                            showToast('父亲已添加但自动关联失败，请手动设置', 'info');
+                        }
+                    }
+                    hideLoading();
+                } catch (err) { hideLoading(); showToast('建立关系异常', 'error'); }
+            } else {
+                showToast(st.isEdit ? '修改成功' : '添加成功', 'success');
+            }
+
+            setTimeout(() => this.navigateTo('people'), 1500);
+        } catch (e) {
+            showToast(e.message || '操作失败', 'error');
+        } finally {
+            st.submitting = false;
+        }
     }
 
     openAddPersonModal() { this.navigateTo('person-edit', { mode: 'add' }); }
@@ -1066,4 +1983,757 @@ class ZupuApp {
                 </div>
                 <div class="msg-content">${m.content || ''}</div>
                 ${images.length > 0 ? `<div class="msg-images">${images.map(url => `<img src="${url}" onclick="window.open('${url}','_blank')" style="max-width:120px;max-height:120px;border-radius:8px;cursor:pointer;margin:4px;">`).join('')}</div>` : ''}
-                ${m.reply ? `<div class="msg-reply"><i class="fas
+                ${m.reply ? `<div class="msg-reply"><i class="fas fa-reply"></i> <span class="msg-reply-text">${m.reply}</span><span class="msg-reply-time">${timeAgo(m.reply_at || m.updated_at)}</span></div>` : ''}
+                <div class="msg-actions">
+                    ${isAdminRole ? `
+                        ${!isRead ? `<button class="btn btn-small btn-outline" onclick="app.markMessageRead(${m.id})"><i class="fas fa-check"></i> 已读</button>` : ''}
+                        <button class="btn btn-small btn-outline" onclick="app.replyMessage(${m.id})"><i class="fas fa-reply"></i> ${m.reply ? '修改回复' : '回复'}</button>
+                        <button class="btn btn-small btn-danger" onclick="app.deleteMessage(${m.id})"><i class="fas fa-trash"></i></button>
+                    ` : (m.guest_id === (this.currentUser?.guest_id) || m.li_shi_id === this.currentUser?.li_shi_id ? `<button class="btn btn-small btn-danger" onclick="app.deleteMessage(${m.id})"><i class="fas fa-trash"></i> 删除</button>` : '')}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    async submitMessage() {
+        const input = document.getElementById('msg-compose-input');
+        const content = input?.value?.trim();
+        if (!content) { showToast('请输入留言内容', 'error'); return; }
+        showLoading();
+        try {
+            const imageUrls = (this._msgImageUrls && this._msgImageUrls.length > 0) ? JSON.stringify(this._msgImageUrls) : undefined;
+            const res = await api.createMessage(content, imageUrls);
+            if (res.status === 'success') { showToast('留言发布成功', 'success'); input.value = ''; this._msgImageUrls = []; document.getElementById('msg-img-preview').innerHTML = ''; document.getElementById('msg-char-count').textContent = '0/500'; this.loadMessages(); }
+            else showToast(res.message || '发布失败', 'error');
+        } catch (e) { showToast('发布失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    async handleMessageImage(e) {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+        if (!this._msgImageUrls) this._msgImageUrls = [];
+        const remain = 9 - this._msgImageUrls.length;
+        if (remain <= 0) { showToast('最多9张图片', 'error'); return; }
+        for (const file of files.slice(0, remain)) {
+            showLoading();
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('type', 'messages');
+                const res = await api.uploadFile(formData);
+                if (res.status === 'success' && res.url) {
+                    this._msgImageUrls.push(res.url);
+                    this._renderMsgImagePreview();
+                } else showToast(res.message || '上传失败', 'error');
+            } catch (e) { showToast('上传失败', 'error'); }
+            finally { hideLoading(); }
+        }
+        e.target.value = '';
+    }
+
+    _renderMsgImagePreview() {
+        const container = document.getElementById('msg-img-preview');
+        if (!container) return;
+        container.innerHTML = (this._msgImageUrls || []).map((url, idx) =>
+            `<img src="${url}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;margin:2px;cursor:pointer;" onclick="app._removeMsgImage(${idx})">`
+        ).join('');
+    }
+
+    _removeMsgImage(idx) {
+        this._msgImageUrls.splice(idx, 1);
+        this._renderMsgImagePreview();
+    }
+
+    async markMessageRead(id) {
+        try {
+            const res = await api.markMessageRead(id);
+            if (res.status === 'success') this.loadMessages();
+        } catch (e) { showToast('操作失败', 'error'); }
+    }
+
+    replyMessage(id) {
+        const reply = prompt('回复留言：');
+        if (reply === null) return;
+        showLoading();
+        api.replyMessage(id, reply).then(res => {
+            if (res.status === 'success') { showToast('回复成功', 'success'); this.loadMessages(); }
+            else showToast(res.message || '回复失败', 'error');
+        }).catch(() => showToast('回复失败', 'error')).finally(() => hideLoading());
+    }
+
+    async deleteMessage(id) {
+        this.showConfirm('删除留言', '确定删除此留言吗？', async () => {
+            showLoading();
+            try {
+                const res = await api.deleteMessage(id);
+                if (res.status === 'success') { showToast('已删除', 'success'); this.loadMessages(); }
+                else showToast(res.message || '删除失败', 'error');
+            } catch (e) { showToast('删除失败', 'error'); }
+            finally { hideLoading(); }
+        });
+    }
+
+    async clearAllMessages() {
+        this.showConfirm('清空留言', '确定清空所有留言吗？此操作不可恢复！', async () => {
+            showLoading();
+            try {
+                const res = await api.clearAllMessages();
+                if (res.status === 'success') { showToast('已清空', 'success'); this.loadMessages(); }
+                else showToast(res.message || '清空失败', 'error');
+            } catch (e) { showToast('清空失败', 'error'); }
+            finally { hideLoading(); }
+        });
+    }
+
+    // ═══ 公告管理 ═══
+    async loadAnnouncementManage() {
+        showLoading();
+        try {
+            const res = await api.getAnnouncements();
+            if (res.status === 'success') this.renderAnnouncementManage(res.data || []);
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    renderAnnouncementManage(announcements) {
+        const container = document.getElementById('announcement-manage-list');
+        if (!container) return;
+        if (announcements.length === 0) { container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px;">暂无公告</p>'; return; }
+        const pageLabels = { index: '首页', 'announcement-board': '公告板', people: '人员管理', tree: '世系图', baota: '宝塔树', 'generation-names': '字辈列表', messages: '留言', me: '我的', worship: '祭拜' };
+        container.innerHTML = announcements.map(a => `
+        <div class="ann-mgmt-card">
+            <div class="ann-mgmt-header">
+                <span class="ann-mgmt-id">#${a.id}</span>
+                <span class="badge ${a.is_active == 1 ? 'badge-alive' : 'badge-deceased'}">${a.is_active == 1 ? '生效' : '停用'}</span>
+            </div>
+            <div class="ann-mgmt-content">${a.content || ''}</div>
+            <div class="ann-mgmt-meta">
+                ${(a.pages || '').split(',').filter(s=>s).map(p => `<span class="chip">${pageLabels[p] || p}</span>`).join('')}
+                <span class="ann-mgmt-duration">${a.scroll_duration || 8}秒</span>
+            </div>
+            <div class="ann-mgmt-actions">
+                <button class="btn btn-small btn-outline" onclick="app.editAnnouncement(${a.id})"><i class="fas fa-edit"></i> 编辑</button>
+                <button class="btn btn-small btn-outline" onclick="app.toggleAnnouncement(${a.id}, ${a.is_active == 1 ? 0 : 1})">${a.is_active == 1 ? '停用' : '启用'}</button>
+                <button class="btn btn-small btn-danger" onclick="app.deleteAnnouncement(${a.id})"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>`).join('');
+    }
+
+    openAnnouncementEditor(ann) {
+        const isEdit = !!ann;
+        const a = ann || {};
+        const pageLabels = { index: '首页', 'announcement-board': '公告板', people: '人员管理', tree: '世系图', baota: '宝塔树', 'generation-names': '字辈列表', messages: '留言', me: '我的', worship: '祭拜' };
+        const selectedPages = (a.pages || '').split(',').filter(s => s);
+        const body = `
+            <div class="form-group"><label>公告内容 <span id="ann-char-count">${(a.content||'').length}/500</span></label><textarea id="ann-content-input" maxlength="500" rows="4" oninput="document.getElementById('ann-char-count').textContent=this.value.length+'/500'">${a.content || ''}</textarea></div>
+            <div class="form-group"><label>展示页面</label><div class="ann-page-chips">${Object.keys(pageLabels).map(k => `<label class="chip-selectable"><input type="checkbox" name="ann-pages" value="${k}" ${selectedPages.includes(k)?'checked':''}>${pageLabels[k]}</label>`).join('')}</div></div>
+            <div class="form-group"><label>展示时长（秒）</label><input type="number" id="ann-duration-input" min="1" max="120" value="${a.scroll_duration || 8}"></div>
+            <div class="form-group"><label><input type="checkbox" id="ann-scroll-enabled" ${a.scroll_enabled !== 0 ? 'checked' : ''}> 启用滚动效果</label></div>
+        `;
+        this.showDynamicModal(isEdit ? '编辑公告' : '新建公告', body, () => this._saveAnnouncement(isEdit ? a.id : null));
+    }
+
+    async _saveAnnouncement(id) {
+        const content = document.getElementById('ann-content-input')?.value?.trim();
+        if (!content) { showToast('请输入公告内容', 'error'); return; }
+        const pages = Array.from(document.querySelectorAll('input[name="ann-pages"]:checked')).map(el => el.value).join(',');
+        const scrollDuration = parseInt(document.getElementById('ann-duration-input')?.value) || 8;
+        const scrollEnabled = document.getElementById('ann-scroll-enabled')?.checked ? 1 : 0;
+        showLoading();
+        try {
+            let res;
+            if (id) res = await api.updateAnnouncement(id, { content, pages, scroll_duration: scrollDuration, scroll_enabled: scrollEnabled });
+            else res = await api.createAnnouncement(content, pages, scrollDuration, scrollEnabled);
+            if (res.status === 'success') { showToast('保存成功', 'success'); this.closeDynamicModal(); this.loadAnnouncementManage(); }
+            else showToast(res.message || '保存失败', 'error');
+        } catch (e) { showToast('保存失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    editAnnouncement(id) {
+        api.getAnnouncements().then(res => {
+            if (res.status === 'success') {
+                const ann = (res.data || []).find(a => a.id === id);
+                if (ann) this.openAnnouncementEditor(ann);
+            }
+        });
+    }
+
+    async toggleAnnouncement(id, isActive) {
+        showLoading();
+        try {
+            const res = await api.updateAnnouncement(id, { is_active: isActive });
+            if (res.status === 'success') { showToast(isActive ? '已启用' : '已停用', 'success'); this.loadAnnouncementManage(); }
+            else showToast(res.message || '操作失败', 'error');
+        } catch (e) { showToast('操作失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    async deleteAnnouncement(id) {
+        this.showConfirm('删除公告', '确定删除此公告吗？', async () => {
+            showLoading();
+            try {
+                const res = await api.deleteAnnouncement(id);
+                if (res.status === 'success') { showToast('已删除', 'success'); this.loadAnnouncementManage(); }
+                else showToast(res.message || '删除失败', 'error');
+            } catch (e) { showToast('删除失败', 'error'); }
+            finally { hideLoading(); }
+        });
+    }
+
+    // ═══ 公告板 ═══
+    async loadAnnouncementBoard() {
+        showLoading();
+        try {
+            const params = this._navParams || {};
+            const fromPage = params.fromPage || '';
+            const res = await api.getAnnouncements();
+            if (res.status === 'success') {
+                let anns = (res.data || []).filter(a => a.is_active == 1);
+                if (fromPage) {
+                    const fromPageSet = new Set(fromPage.split(','));
+                    anns = anns.filter(a => {
+                        const pages = (a.pages || '').split(',').map(s => s.trim()).filter(s => s);
+                        return pages.some(p => fromPageSet.has(p)) || pages.includes('announcement-board');
+                    });
+                } else {
+                    anns = anns.filter(a => {
+                        const pages = (a.pages || '').split(',').map(s => s.trim()).filter(s => s);
+                        return pages.includes('announcement-board');
+                    });
+                }
+                this.renderAnnouncementBoard(anns);
+            }
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    renderAnnouncementBoard(announcements) {
+        const container = document.getElementById('announcement-board-content');
+        if (!container) return;
+        if (announcements.length === 0) { container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px;">暂无公告</p>'; return; }
+        container.innerHTML = announcements.map(a => `
+        <div class="card" style="margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-size:12px;color:var(--text-muted);">${a.created_at ? new Date(a.created_at).toLocaleDateString() : ''}</span>
+            </div>
+            <div style="font-size:15px;color:var(--text-primary);line-height:1.8;">${this.renderAnnouncementTemplate(a.content || '')}</div>
+        </div>`).join('');
+    }
+
+    // ═══ 帐号管理 ═══
+    async loadAdminAccounts() {
+        showLoading();
+        try {
+            const res = await api.getAdminWxAccounts();
+            if (res.status === 'success') { this.adminAccounts = res.data || []; this.filterAdminAccounts(); }
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    filterAdminAccounts() {
+        const search = document.getElementById('admin-search')?.value.toLowerCase() || '';
+        const filter = this.adminFilter;
+        const sortDir = this.adminLoginSortDir;
+        let accounts = [...this.adminAccounts];
+        // Filter
+        if (filter === 'unverified') accounts = accounts.filter(a => a.verified !== 1);
+        else if (filter === 'verified') accounts = accounts.filter(a => a.verified === 1);
+        else if (filter === 'admin') accounts = accounts.filter(a => a.role === 'admin' || a.role === 'super_admin');
+        if (search) accounts = accounts.filter(a => ((a.nickname || '').toLowerCase().includes(search)) || ((a.li_shi_id || '').toLowerCase().includes(search)) || ((a.phone || '').includes(search)));
+        // Sort
+        if (sortDir === 1) accounts.sort((a, b) => (b.last_login_at || '').localeCompare(a.last_login_at || ''));
+        else if (sortDir === 2) accounts.sort((a, b) => (a.last_login_at || '').localeCompare(b.last_login_at || ''));
+        // Update batch buttons
+        const hasSelected = this.adminSelectedIds.size > 0;
+        document.getElementById('batch-verify-btn')?.toggleAttribute('disabled', !hasSelected);
+        document.getElementById('batch-delete-btn')?.toggleAttribute('disabled', !hasSelected);
+        document.getElementById('batch-role-btn')?.toggleAttribute('disabled', !hasSelected);
+        this.renderAdminAccounts(accounts);
+    }
+
+    renderAdminAccounts(accounts) {
+        const container = document.getElementById('admin-accounts-list');
+        if (!container) return;
+        const roleLabels = { guest: '匿名游客', user: '未认证', member: '家族成员', admin: '管理员', super_admin: '超管员' };
+        const roleColors = { guest: '#999', user: '#e67e22', member: '#27ae60', admin: '#2196F3', super_admin: '#c0392b' };
+        if (accounts.length === 0) { container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px;">暂无帐号数据</p>'; return; }
+        container.innerHTML = accounts.map(a => {
+            const isSelected = this.adminSelectedIds.has(a.li_shi_id);
+            const isMe = a.li_shi_id === this.currentUser?.li_shi_id;
+            const isSuperAdmin = this.currentUser?.role === 'super_admin';
+            return `
+            <div class="admin-card ${isSelected ? 'selected' : ''}">
+                <div class="admin-card-left">
+                    ${!isMe ? `<input type="checkbox" ${isSelected ? 'checked' : ''} onchange="app.toggleAdminSelect('${a.li_shi_id}')">` : ''}
+                </div>
+                <div class="admin-card-main">
+                    <div class="admin-name">${a.nickname || '未设置'}</div>
+                    <span class="role-tag-small" style="background:${roleColors[a.role] || '#999'};color:#fff;">${roleLabels[a.role] || a.role}</span>
+                    <span class="admin-verify ${a.verified === 1 ? 'verified' : 'unverified'}">${a.verified === 1 ? '✅' : '❌'}</span>
+                </div>
+                <div class="admin-card-info">
+                    <div>李氏号: ${a.li_shi_id || '-'}</div>
+                    <div>绑定: ${a.person_name || '-'}</div>
+                    <div>登录: ${a.last_login_at ? timeAgo(a.last_login_at) : '-'}</div>
+                </div>
+                <div class="admin-card-actions">
+                    ${a.verified !== 1 ? `<button class="btn btn-small btn-outline" onclick="app.verifyMember('${a.li_shi_id}')">认证</button>` : ''}
+                    ${a.verified === 1 && isSuperAdmin ? `<button class="btn btn-small btn-outline" onclick="app.unverifyMember('${a.li_shi_id}')">取消认证</button>` : ''}
+                    ${isSuperAdmin ? `<button class="btn btn-small btn-outline" onclick="app.changeRole('${a.li_shi_id}')">改角色</button>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    toggleAdminSelect(liShiId) {
+        if (this.adminSelectedIds.has(liShiId)) this.adminSelectedIds.delete(liShiId);
+        else this.adminSelectedIds.add(liShiId);
+        this.filterAdminAccounts();
+    }
+
+    async verifyMember(liShiId) {
+        showLoading();
+        try {
+            const res = await api.verifyMember(liShiId);
+            if (res.status === 'success') { showToast('认证成功', 'success'); this.loadAdminAccounts(); }
+            else showToast(res.message || '认证失败', 'error');
+        } catch (e) { showToast('认证失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    async unverifyMember(liShiId) {
+        showLoading();
+        try {
+            const res = await api.unverifyMember(liShiId);
+            if (res.status === 'success') { showToast('已取消认证', 'success'); this.loadAdminAccounts(); }
+            else showToast(res.message || '操作失败', 'error');
+        } catch (e) { showToast('操作失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    changeRole(liShiId) {
+        const roles = ['user', 'member', 'admin'];
+        const roleLabels = { user: '未认证', member: '家族成员', admin: '管理员' };
+        const body = `<div class="form-group"><label>选择角色</label><select id="change-role-select">${roles.map(r => `<option value="${r}">${roleLabels[r]}</option>`).join('')}</select></div>`;
+        this.showDynamicModal('修改角色', body, () => this._doChangeRole(liShiId));
+    }
+
+    async _doChangeRole(liShiId) {
+        const role = document.getElementById('change-role-select')?.value;
+        showLoading();
+        try {
+            const res = await api.changeRole(liShiId, role);
+            if (res.status === 'success') { showToast('角色修改成功', 'success'); this.closeDynamicModal(); this.loadAdminAccounts(); }
+            else showToast(res.message || '修改失败', 'error');
+        } catch (e) { showToast('修改失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    async batchVerify() {
+        if (this.adminSelectedIds.size === 0) return;
+        this.showConfirm('批量认证', `确定认证选中的 ${this.adminSelectedIds.size} 个帐号吗？`, async () => {
+            showLoading();
+            try {
+                const res = await api.batchVerify(Array.from(this.adminSelectedIds));
+                if (res.status === 'success') { showToast('批量认证成功', 'success'); this.adminSelectedIds.clear(); this.loadAdminAccounts(); }
+                else showToast(res.message || '操作失败', 'error');
+            } catch (e) { showToast('操作失败', 'error'); }
+            finally { hideLoading(); }
+        });
+    }
+
+    async batchDeleteUsers() {
+        if (this.adminSelectedIds.size === 0) return;
+        this.showConfirm('批量删除', `确定删除选中的 ${this.adminSelectedIds.size} 个帐号吗？`, async () => {
+            showLoading();
+            try {
+                const res = await api.batchDeleteUsers(Array.from(this.adminSelectedIds));
+                if (res.status === 'success') { showToast('删除成功', 'success'); this.adminSelectedIds.clear(); this.loadAdminAccounts(); }
+                else showToast(res.message || '操作失败', 'error');
+            } catch (e) { showToast('操作失败', 'error'); }
+            finally { hideLoading(); }
+        });
+    }
+
+    async batchChangeRole() {
+        if (this.adminSelectedIds.size === 0) return;
+        const roles = ['user', 'member', 'admin'];
+        const roleLabels = { user: '未认证', member: '家族成员', admin: '管理员' };
+        const body = `<div class="form-group"><label>选择角色</label><select id="batch-role-select">${roles.map(r => `<option value="${r}">${roleLabels[r]}</option>`).join('')}</select></div>`;
+        this.showDynamicModal('批量改角色', body, async () => {
+            const role = document.getElementById('batch-role-select')?.value;
+            showLoading();
+            try {
+                const res = await api.batchChangeRole(Array.from(this.adminSelectedIds), role);
+                if (res.status === 'success') { showToast('批量改角色成功', 'success'); this.closeDynamicModal(); this.adminSelectedIds.clear(); this.loadAdminAccounts(); }
+                else showToast(res.message || '操作失败', 'error');
+            } catch (e) { showToast('操作失败', 'error'); }
+            finally { hideLoading(); }
+        });
+    }
+
+    // ═══ 祭拜祖先 ═══
+    async loadWorship() {
+        if (isGuest()) { showToast('请先登录', 'error'); this.navigateTo('home'); return; }
+        showLoading();
+        try {
+            const [ancestorsRes, meritRes] = await Promise.all([api.getWorshipAncestors(), api.getMyWorshipMerit()]);
+            if (ancestorsRes.status === 'success') { this.worshipAncestors = ancestorsRes.data || []; this.filterWorshipAncestors(); }
+            if (meritRes.status === 'success') {
+                const meritEl = document.getElementById('worship-my-merit');
+                if (meritEl) meritEl.textContent = `功德 ${meritRes.data?.merit_points || 0}`;
+            }
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    filterWorshipAncestors() {
+        const search = document.getElementById('worship-search')?.value.toLowerCase() || '';
+        let ancestors = [...this.worshipAncestors];
+        if (search) ancestors = ancestors.filter(a => ((a.name || '').toLowerCase().includes(search)) || ((a.generation || '').toLowerCase().includes(search)) || ((a.alias || '').toLowerCase().includes(search)) || ((a.father_name || '').toLowerCase().includes(search)));
+        if (this.worshipFilterShiXi > 0) ancestors = ancestors.filter(a => parseInt(a.shi_xi) <= this.worshipFilterShiXi);
+        if (this.worshipSortMode === 'shi_xi') ancestors.sort((a, b) => parseInt(a.shi_xi) - parseInt(b.shi_xi));
+        else if (this.worshipSortMode === 'incense') ancestors.sort((a, b) => (b.incense_count || 0) - (a.incense_count || 0));
+        this.renderWorshipAncestors(ancestors);
+    }
+
+    renderWorshipAncestors(ancestors) {
+        const container = document.getElementById('worship-ancestors-list');
+        if (!container) return;
+        if (ancestors.length === 0) { container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px;">暂无先祖数据</p>'; return; }
+        container.innerHTML = ancestors.map(a => `
+        <div class="worship-ancestor-card" onclick="app.navigateTo('worship-altar',{ancestor_id:${a.id},ancestor_name:'${encodeURIComponent(a.name)}',shi_xi:'${a.shi_xi}'})">
+            ${this.renderGenderAvatar(a, 'worship-avatar')}
+            <div class="worship-info">
+                <div class="worship-name">${a.name}${a.alias ? `(${a.alias})` : ''}</div>
+                <div class="worship-meta">第${a.shi_xi}世${a.generation ? ' · ' + a.generation : ''}${a.father_name ? ' · ' + a.father_name + '之子' : ''}</div>
+                ${a.age_at_death ? `<div class="worship-age">享年${a.age_at_death}岁</div>` : ''}
+            </div>
+            <button class="btn btn-small btn-primary" onclick="event.stopPropagation();app.navigateTo('worship-altar',{ancestor_id:${a.id},ancestor_name:'${encodeURIComponent(a.name)}',shi_xi:'${a.shi_xi}'})">🕯️ 上香</button>
+        </div>`).join('');
+    }
+
+    // ═══ 祭拜神台 ═══
+    async loadWorshipAltar(params) {
+        if (!params) params = this._navParams || {};
+        const ancestorName = params.ancestor_name ? decodeURIComponent(params.ancestor_name) : '先祖';
+        const shiXi = params.shi_xi || '';
+        const ancestorId = params.ancestor_id;
+        const container = document.getElementById('worship-altar-content');
+        if (!container) return;
+        container.innerHTML = `
+        <div class="altar-page">
+            <div class="altar-back"><button class="btn btn-small btn-outline" onclick="app.navigateTo('worship')"><i class="fas fa-arrow-left"></i> 返回</button></div>
+            <div class="altar-main">
+                <div class="altar-plaque">慎终追远</div>
+                <div class="altar-tablet">
+                    <div class="altar-shi-xi">第${shiXi}世</div>
+                    <div class="altar-name">${ancestorName}</div>
+                    <div class="altar-title">先祖之位</div>
+                </div>
+                <div class="altar-censer" id="altar-censer">
+                    <div class="altar-smoke-layer smoke-1"></div>
+                    <div class="altar-smoke-layer smoke-2"></div>
+                    <div class="altar-smoke-layer smoke-3"></div>
+                    <div class="altar-incense-container" id="altar-incense-container"></div>
+                </div>
+                <div class="altar-candles">
+                    <div class="altar-candle left"><div class="candle-flame"></div></div>
+                    <div class="altar-candle right"><div class="candle-flame"></div></div>
+                </div>
+                <div class="altar-offerings">🍎 🍊 🍵</div>
+            </div>
+            <div class="altar-progress" id="altar-progress"></div>
+            <div class="altar-buttons">
+                <button class="btn btn-worship" id="btn-one-incense" onclick="app.offerIncense(${ancestorId}, 1)">🕯️ 敬上一炷香</button>
+                <button class="btn btn-worship" id="btn-three-incense" onclick="app.offerIncense(${ancestorId}, 3)">🕯️🕯️🕯️ 敬上三支香</button>
+            </div>
+            <div class="altar-merit-info" id="altar-merit-info"></div>
+        </div>`;
+        // Load config
+        try {
+            const configRes = await api.getWorshipConfig();
+            if (configRes.status === 'success' && configRes.data) {
+                this._worshipConfig = configRes.data;
+            }
+        } catch (e) {}
+        // Load merit
+        try {
+            const meritRes = await api.getMyWorshipMerit();
+            if (meritRes.status === 'success') {
+                const info = document.getElementById('altar-merit-info');
+                if (info) info.textContent = `当前功德: ${meritRes.data?.merit_points || 0} | 累计上香: ${meritRes.data?.total_incense || 0}次`;
+            }
+        } catch (e) {}
+    }
+
+    async offerIncense(ancestorId, count) {
+        if (this.worshipBurning) { showToast('香正在燃烧中，请稍候', 'info'); return; }
+        this.worshipBurning = true;
+        this.worshipBurnSeq++;
+        const seq = this.worshipBurnSeq;
+        const duration = (this._worshipConfig?.worship_incense_duration || 60) * 1000;
+        const startTime = Date.now();
+        // 禁用按钮
+        document.getElementById('btn-one-incense')?.setAttribute('disabled', 'true');
+        document.getElementById('btn-three-incense')?.setAttribute('disabled', 'true');
+        // 显示进度
+        const progressEl = document.getElementById('altar-progress');
+        const updateProgress = () => {
+            if (!this.worshipBurning || this.worshipBurnSeq !== seq) return;
+            const elapsed = Date.now() - startTime;
+            const percent = Math.min(100, (elapsed / duration) * 100);
+            if (progressEl) progressEl.textContent = `香燃进度 ${Math.round(percent)}% · 时长${Math.round(elapsed / 1000)}秒`;
+            if (percent < 100) requestAnimationFrame(updateProgress);
+        };
+        updateProgress();
+        // 异步调API
+        let allSuccess = true;
+        let totalMeritGained = 0;
+        let totalMeritCost = 0;
+        let lastMeritPoints = 0;
+        let lastTotalIncense = 0;
+        for (let i = 0; i < count; i++) {
+            try {
+                const res = await api.offerIncense(ancestorId);
+                if (res.status === 'success' && res.data) {
+                    totalMeritGained += res.data.merit_gained || 0;
+                    totalMeritCost += res.data.merit_cost || 0;
+                    lastMeritPoints = res.data.merit_points || 0;
+                    lastTotalIncense = res.data.total_incense || 0;
+                } else { allSuccess = false; break; }
+            } catch (e) { allSuccess = false; break; }
+        }
+        // 等待燃烧时间
+        await new Promise(resolve => setTimeout(resolve, Math.max(0, duration - (Date.now() - startTime))));
+        if (this.worshipBurnSeq !== seq) return;
+        this.worshipBurning = false;
+        document.getElementById('btn-one-incense')?.removeAttribute('disabled');
+        document.getElementById('btn-three-incense')?.removeAttribute('disabled');
+        if (progressEl) progressEl.textContent = '';
+        if (allSuccess) {
+            // 功德弹窗
+            this.showDynamicModal('🙏 祭拜功德圆满', `
+                <div style="text-align:center;padding:20px;">
+                    <div style="font-size:20px;margin-bottom:12px;">获得功德 <span style="color:#27ae60;font-weight:bold;">+${totalMeritGained}</span></div>
+                    ${totalMeritCost > 0 ? `<div style="font-size:14px;color:var(--text-secondary);margin-bottom:8px;">消耗积分 <span style="color:#e74c3c;">-${totalMeritCost}</span></div>` : ''}
+                    <div style="font-size:14px;color:var(--text-secondary);">当前功德 <strong>${lastMeritPoints}</strong> | 累计上香 <strong>${lastTotalIncense}</strong>次</div>
+                </div>
+            `, () => this.closeDynamicModal());
+            setTimeout(() => { if (document.getElementById('dynamic-modal')?.classList.contains('hidden') === false) this.closeDynamicModal(); }, 3500);
+            const info = document.getElementById('altar-merit-info');
+            if (info) info.textContent = `当前功德: ${lastMeritPoints} | 累计上香: ${lastTotalIncense}次`;
+        } else {
+            showToast('上香失败，请重试', 'error');
+        }
+    }
+
+    // ═══ 祭拜设置（超管） ═══
+    async loadWorshipAdmin() {
+        showLoading();
+        try {
+            const configRes = await api.getWorshipConfig();
+            const meritRes = await api.adminGetMeritList();
+            this._worshipAdminConfig = configRes.status === 'success' ? configRes.data : {};
+            this._worshipAdminMeritList = meritRes.status === 'success' ? (meritRes.data || []) : [];
+            this.renderWorshipAdmin();
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    renderWorshipAdmin() {
+        const container = document.getElementById('worship-admin-content');
+        if (!container) return;
+        const c = this._worshipAdminConfig || {};
+        const merits = this._worshipAdminMeritList || [];
+        container.innerHTML = `
+        <div class="card">
+            <h3><i class="fas fa-fire"></i> 🔥 上香燃烧时长</h3>
+            <div class="form-group"><input type="number" id="wa-duration" min="5" max="600" value="${c.worship_incense_duration || 60}"> 秒</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+                <button class="btn btn-small btn-outline" onclick="document.getElementById('wa-duration').value=15">15秒(演示)</button>
+                <button class="btn btn-small btn-outline" onclick="document.getElementById('wa-duration').value=30">30秒</button>
+                <button class="btn btn-small btn-outline" onclick="document.getElementById('wa-duration').value=60">60秒(默认)</button>
+                <button class="btn btn-small btn-outline" onclick="document.getElementById('wa-duration').value=120">2分钟</button>
+                <button class="btn btn-small btn-outline" onclick="document.getElementById('wa-duration').value=300">5分钟</button>
+            </div>
+            <div class="form-group"><label><input type="checkbox" id="wa-unlimited" ${c.worship_unlimited_mode !== 0 ? 'checked' : ''}> 无限上香模式</label></div>
+            <div class="form-group"><label><input type="checkbox" id="wa-daily-limit-enabled" ${c.worship_daily_limit_enabled == 1 ? 'checked' : ''}> 每日上香次数上限</label> <input type="number" id="wa-daily-limit-count" min="1" max="999" value="${c.worship_daily_limit_count || 10}" style="width:60px;"></div>
+            <div class="form-group"><label><input type="checkbox" id="wa-merit-cost-enabled" ${c.worship_merit_cost_enabled == 1 ? 'checked' : ''}> 上香消耗积分模式</label> 每次消耗 <input type="number" id="wa-merit-cost-amount" min="1" max="999" value="${c.worship_merit_cost_amount || 1}" style="width:60px;"></div>
+            <div class="form-group">每次上香获得功德 <input type="number" id="wa-merit-gain-amount" min="1" max="999" value="${c.worship_merit_gain_amount || 10}" style="width:60px;"></div>
+            <button class="btn btn-primary btn-block" onclick="app.saveWorshipConfig()"><i class="fas fa-save"></i> 保存配置</button>
+        </div>
+        <div class="card mt-20">
+            <h3><i class="fas fa-trophy"></i> 积分总览 (${merits.length}人)</h3>
+            ${merits.length === 0 ? '<p style="color:var(--text-muted);text-align:center;padding:20px;">暂无数据</p>' :
+            merits.slice(0, 20).map(m => `
+            <div class="merit-row">
+                <span class="merit-name">${m.nickname || m.name || '匿名'}</span>
+                <span class="merit-points">${m.merit_points || 0} 功德</span>
+                <button class="btn btn-small btn-outline" onclick="app.adjustWorshipMerit(${m.id})">调整</button>
+            </div>`).join('')}
+        </div>`;
+    }
+
+    async saveWorshipConfig() {
+        const data = {
+            worship_incense_duration: parseInt(document.getElementById('wa-duration')?.value) || 60,
+            worship_unlimited_mode: document.getElementById('wa-unlimited')?.checked ? 1 : 0,
+            worship_daily_limit_enabled: document.getElementById('wa-daily-limit-enabled')?.checked ? 1 : 0,
+            worship_daily_limit_count: parseInt(document.getElementById('wa-daily-limit-count')?.value) || 10,
+            worship_merit_cost_enabled: document.getElementById('wa-merit-cost-enabled')?.checked ? 1 : 0,
+            worship_merit_cost_amount: parseInt(document.getElementById('wa-merit-cost-amount')?.value) || 1,
+            worship_merit_gain_amount: parseInt(document.getElementById('wa-merit-gain-amount')?.value) || 10,
+        };
+        showLoading();
+        try {
+            const res = await api.updateWorshipConfig(data);
+            if (res.status === 'success') { showToast('配置已保存', 'success'); this._worshipConfig = data; }
+            else showToast(res.message || '保存失败', 'error');
+        } catch (e) { showToast('保存失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    adjustWorshipMerit(meritId) {
+        const body = `
+            <div class="form-group"><label>操作类型</label><select id="wa-adjust-action"><option value="add">增加</option><option value="subtract">扣除</option><option value="set">设为</option><option value="clear">清零</option></select></div>
+            <div class="form-group"><label>数量</label><input type="number" id="wa-adjust-amount" min="1" value="10"></div>
+            <div class="form-group"><label>备注</label><input type="text" id="wa-adjust-reason" placeholder="调整原因"></div>
+        `;
+        this.showDynamicModal('调整功德', body, () => this._doAdjustMerit(meritId));
+    }
+
+    async _doAdjustMerit(meritId) {
+        const action = document.getElementById('wa-adjust-action')?.value;
+        const amount = parseInt(document.getElementById('wa-adjust-amount')?.value) || 0;
+        const reason = document.getElementById('wa-adjust-reason')?.value || '';
+        showLoading();
+        try {
+            const res = await api.adminAdjustMerit(meritId, action, amount, reason);
+            if (res.status === 'success') { showToast('调整成功', 'success'); this.closeDynamicModal(); this.loadWorshipAdmin(); }
+            else showToast(res.message || '调整失败', 'error');
+        } catch (e) { showToast('调整失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    // ═══ 祭拜实时排行 ═══
+    async loadWorshipLiveRank() {
+        showLoading();
+        try {
+            const [recordsRes, boardRes] = await Promise.all([api.getWorshipRecentRecords(50), api.getWorshipMeritBoard(50)]);
+            this.renderWorshipLiveRank(recordsRes.status === 'success' ? (recordsRes.data || []) : [], boardRes.status === 'success' ? (boardRes.data || []) : []);
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    renderWorshipLiveRank(records, board) {
+        const container = document.getElementById('worship-live-rank-content');
+        if (!container) return;
+        container.innerHTML = `
+        <div class="card">
+            <h3><i class="fas fa-chart-line"></i> 最近上香记录</h3>
+            ${records.length === 0 ? '<p style="color:var(--text-muted);text-align:center;">暂无记录</p>' :
+            records.map(r => `<div class="rank-item"><span class="rank-name">${r.operator_name || '匿名'}</span><span class="rank-action">为 <strong>${r.ancestor_name || '先祖'}</strong> 上香</span><span class="rank-time">${timeAgo(r.created_at)}</span></div>`).join('')}
+        </div>
+        <div class="card mt-20">
+            <h3><i class="fas fa-trophy"></i> 总柱数排行</h3>
+            ${board.length === 0 ? '<p style="color:var(--text-muted);text-align:center;">暂无数据</p>' :
+            board.map((b, i) => `<div class="rank-item"><span class="rank-num">${i + 1}</span><span class="rank-name">${b.nickname || b.name || '匿名'}</span><span class="rank-count">${b.total_incense || 0}柱</span><span class="rank-merit">${b.merit_points || 0}功德</span></div>`).join('')}
+        </div>`;
+    }
+
+    // ═══ 祭拜功德排行 ═══
+    async loadWorshipMeritRank() {
+        showLoading();
+        try {
+            const res = await api.getWorshipMeritBoard(100);
+            if (res.status === 'success') this.renderWorshipMeritRank(res.data || []);
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    renderWorshipMeritRank(list) {
+        const container = document.getElementById('worship-merit-rank-content');
+        if (!container) return;
+        if (list.length === 0) { container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px;">暂无数据</p>'; return; }
+        container.innerHTML = `<div class="card">${list.map((m, i) => `
+            <div class="rank-item">
+                <span class="rank-num ${i < 3 ? 'top3' : ''}">${i + 1}</span>
+                <span class="rank-name">${m.nickname || m.name || '匿名'}${m.generation ? '(' + m.generation + ')' : ''}${m.shi_xi ? ' · 第' + m.shi_xi + '世' : ''}</span>
+                <span class="rank-merit">${m.merit_points || 0} 功德</span>
+            </div>`).join('')}</div>`;
+    }
+
+    // ═══ 世系图/宝塔树（已有基础，后续优化） ═══
+    async loadTree() { /* 已有实现 */ }
+    async loadBaota(showBefore17) { /* 已有实现 */ }
+
+    // 世系图缩放
+    zoomTree(delta) { this.treeZoom = Math.max(50, Math.min(200, this.treeZoom + delta)); document.getElementById('tree-zoom-level').textContent = this.treeZoom + '%'; }
+    resetTreeZoom() { this.treeZoom = 100; document.getElementById('tree-zoom-level').textContent = '100%'; }
+    setTreeMode(mode) { this.treeMode = mode; }
+
+    // 宝塔树缩放
+    zoomBaota(delta) { this.baotaZoom = Math.max(50, Math.min(300, this.baotaZoom + delta)); document.getElementById('baota-zoom-level').textContent = this.baotaZoom + '%'; }
+    resetBaotaZoom() { this.baotaZoom = 100; document.getElementById('baota-zoom-level').textContent = '100%'; }
+
+    // 世系图选中人员操作
+    addRelative(type) { showToast('添加' + type + '功能开发中', 'info'); }
+    editSelectedTreePerson() { if (this.selectedTreePerson) this.navigateTo('person-edit', { id: this.selectedTreePerson.id }); }
+    viewSelectedTreePerson() { if (this.selectedTreePerson) this.navigateTo('person-detail', { id: this.selectedTreePerson.id }); }
+
+    // 宝塔树选中人员操作
+    addBaotaRelative(type) {
+        if (!this.selectedBaotaPerson) return;
+        const p = this.selectedBaotaPerson;
+        if (type === 'son') this.navigateTo('person-edit', { relation: 'child', targetId: p.id, targetName: encodeURIComponent(p.name), father_id: p.id, shi_xi: String(parseInt(p.shi_xi || 1) + 1), gender: '男' });
+        else if (type === 'spouse') this.navigateTo('person-edit', { relation: 'spouse', targetId: p.id, targetName: encodeURIComponent(p.name) });
+    }
+    editSelectedBaotaPerson() { if (this.selectedBaotaPerson) this.navigateTo('person-edit', { id: this.selectedBaotaPerson.id }); }
+    viewSelectedBaotaPerson() { if (this.selectedBaotaPerson) this.navigateTo('person-detail', { id: this.selectedBaotaPerson.id }); }
+    async bindSelectedBaotaPerson() {
+        if (!this.selectedBaotaPerson || !this.currentUser?.personId) return;
+        this.showConfirm('绑定人物', `确定绑定"${this.selectedBaotaPerson.name}"吗？`, async () => {
+            await this.bindPerson(this.selectedBaotaPerson.id);
+        });
+    }
+
+    closeTreePanel() { document.getElementById('tree-side-panel')?.classList.add('hidden'); this.selectedTreePerson = null; }
+    closeBaotaPanel() { document.getElementById('baota-side-panel')?.classList.add('hidden'); this.selectedBaotaPerson = null; }
+}
+
+// ═══ 全局工具函数 ═══
+const app = new ZupuApp();
+
+function showToast(msg, type = 'info') {
+    const el = document.getElementById('toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = `toast toast-${type}`;
+    el.classList.remove('hidden');
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => el.classList.add('hidden'), 2500);
+}
+
+function showLoading() { document.getElementById('loading')?.classList.remove('hidden'); }
+function hideLoading() { document.getElementById('loading')?.classList.add('hidden'); }
+
+function timeAgo(dateStr) {
+    if (!dateStr) return '';
+    const now = Date.now();
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const diff = now - d.getTime();
+    if (diff < 60000) return '刚刚';
+    if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+    if (diff < 2592000000) return Math.floor(diff / 86400000) + '天前';
+    return d.toLocaleDateString();
+}
+
+function maskPhone(phone) {
+    if (!phone || phone.length < 7) return phone || '';
+    return phone.substring(0, 3) + '****' + phone.substring(phone.length - 4);
+}

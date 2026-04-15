@@ -1110,3 +1110,289 @@ body {
     .gen-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
     .people-list { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
 }
+
+/* ═══════════════════════════════════════════════
+   人员编辑页样式 (Person Edit)
+   ═══════════════════════════════════════════════ */
+
+/* 顶部返回栏 */
+.pe-back-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; background: #fff;
+    border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10;
+}
+.pe-back-bar .pe-title {
+    font-size: 17px; font-weight: 600; color: var(--text-primary);
+}
+
+/* 滚动内容区 */
+.pe-scroll-content {
+    padding: 12px 16px 80px;
+}
+
+/* 通用卡片 */
+.pe-card {
+    background: #fff; border-radius: 12px;
+    padding: 16px 18px; margin-bottom: 12px;
+    box-shadow: var(--shadow);
+}
+
+.pe-section-header {
+    font-size: 14px; font-weight: 600; color: #495057;
+    margin-bottom: 10px; padding-bottom: 8px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+/* 配偶模式提示条 */
+.pe-spouse-hint {
+    background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%);
+    border-radius: 12px; padding: 14px 18px; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 2px 8px rgba(233,30,99,0.12);
+}
+.pe-hint-icon { font-size: 20px; flex-shrink: 0; }
+.pe-hint-text { font-size: 13px; color: #c2185b; font-weight: 500; line-height: 1.5; }
+
+/* 头像+姓名区 */
+.pe-avatar-name-row { display: flex; gap: 10px; }
+.pe-avatar-box {
+    width: 110px; height: 110px; flex-shrink: 0;
+    background: #e0e0e0; border-radius: 10px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; position: relative;
+}
+.pe-avatar-box:hover { opacity: 0.85; }
+.pe-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+.pe-avatar-placeholder {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 2px;
+}
+.pe-avatar-icon { font-size: 28px; color: #999; font-weight: bold; }
+.pe-avatar-text { font-size: 11px; color: #999; }
+
+.pe-name-fields {
+    flex: 1; display: flex; flex-direction: column;
+    justify-content: space-between; min-height: 110px;
+}
+.pe-name-row {
+    display: flex; align-items: center; height: 34px;
+    border-bottom: 1px solid #f0f0f0;
+}
+.pe-field-label {
+    font-size: 14px; color: #333; width: 52px;
+    flex-shrink: 0; text-align: right; padding-right: 6px;
+}
+
+/* 输入框容器 */
+.pe-input-wrap {
+    flex: 1; min-width: 0; background: #f8f9fa;
+    border: 1px solid #d0d5dd; border-radius: 6px;
+    padding: 0 8px; overflow: hidden;
+}
+.pe-input {
+    width: 100%; height: 32px; line-height: 32px;
+    font-size: 14px; color: #333; border: none;
+    background: transparent; outline: none;
+}
+.pe-name-input-wrap { max-width: 140px; }
+.pe-gen-input-wrap { max-width: 60px; }
+
+/* 性别选择 */
+.pe-gender-box {
+    flex-shrink: 0; margin-left: 6px;
+    font-size: 13px; color: #667eea; background: #f0f4ff;
+    padding: 4px 14px; border-radius: 6px; font-weight: 500;
+    text-align: center; cursor: pointer; user-select: none;
+}
+.pe-gender-box:hover { background: #e0e7ff; }
+
+/* 世系选择 */
+.pe-shixi-label {
+    font-size: 13px; color: #667eea; margin-left: 4px;
+    flex-shrink: 0; padding-right: 2px;
+}
+.pe-shixi-select {
+    font-size: 13px; color: #764ba2; background: #f3e8ff;
+    padding: 4px 8px; border-radius: 6px; font-weight: 500;
+    border: none; cursor: pointer; max-width: 64px;
+}
+
+/* 手机号行 */
+.pe-phone-row {
+    display: flex; align-items: center; height: 34px;
+    border-top: 1px solid #f0f0f0; margin-top: 6px; padding-top: 6px;
+}
+
+/* 排行+父亲+过继三列 */
+.pe-triple-row {
+    display: flex; padding: 14px 10px; gap: 8px;
+}
+.pe-triple-item {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; gap: 6px;
+}
+.pe-triple-label { font-size: 13px; color: #666; font-weight: 500; }
+.pe-triple-picker {
+    font-size: 13px; color: #333; background: #f8f9fa;
+    padding: 8px 4px; border-radius: 6px;
+    border: 1px solid #e0e0e0; text-align: center;
+    width: 100%; box-sizing: border-box; cursor: pointer;
+}
+
+/* 开关组件 */
+.pe-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+.pe-switch input { opacity: 0; width: 0; height: 0; }
+.pe-switch-slider {
+    position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+    background: #ccc; border-radius: 24px; transition: 0.3s;
+}
+.pe-switch-slider:before {
+    position: absolute; content: ""; height: 18px; width: 18px;
+    left: 3px; bottom: 3px; background: #fff;
+    border-radius: 50%; transition: 0.3s;
+}
+.pe-switch input:checked + .pe-switch-slider { background: #667eea; }
+.pe-switch input:checked + .pe-switch-slider:before { transform: translateX(20px); }
+.pe-switch input:disabled + .pe-switch-slider { opacity: 0.5; cursor: not-allowed; }
+
+/* 继父列表 */
+.pe-adopt-section { padding: 12px 14px; }
+.pe-adopt-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.pe-adopt-label { font-size: 13px; color: #666; flex-shrink: 0; min-width: 48px; }
+.pe-adopt-picker {
+    flex: 1; min-width: 0; font-size: 12px; color: #007bff;
+    background: #e7f1ff; padding: 6px 8px; border-radius: 6px;
+    border: none; cursor: pointer; box-sizing: border-box;
+}
+.pe-adopt-remove {
+    width: 24px; height: 24px; display: flex; align-items: center;
+    justify-content: center; color: #e74c3c; font-size: 14px;
+    flex-shrink: 0; cursor: pointer;
+}
+.pe-adopt-remove:hover { opacity: 0.6; }
+.pe-adopt-add {
+    display: flex; align-items: center; justify-content: center;
+    padding: 8px; color: #007bff; font-size: 13px;
+    background: #f0f7ff; border-radius: 6px;
+    border: 1px dashed #007bff; cursor: pointer;
+}
+.pe-adopt-add:hover { background: #e0efff; }
+
+/* 健在+历法行 */
+.pe-status-row { display: flex; align-items: center; padding: 14px 18px; }
+.pe-alive-toggle { display: flex; align-items: center; gap: 8px; }
+.pe-alive-label { font-size: 14px; font-weight: 600; color: #333; }
+.pe-alive-status { font-size: 12px; color: #6c757d; }
+.pe-calendar-select { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.pe-calendar-label { font-size: 13px; color: #666; }
+.pe-calendar-box {
+    font-size: 13px; color: #fff;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 5px 16px; border-radius: 6px; text-align: center;
+    border: none; cursor: pointer;
+}
+
+/* 出生/去世信息 */
+.pe-birth-section, .pe-death-section { padding: 14px 18px; }
+.pe-date-row { display: flex; align-items: center; gap: 6px; }
+.pe-date-input {
+    flex: 1; font-size: 14px; color: #333;
+    padding: 8px 10px; background: #f8f9fa;
+    border-radius: 6px; border: 1px solid #e0e0e0;
+}
+.pe-unknown-btn {
+    flex-shrink: 0; font-size: 12px; color: #999;
+    padding: 6px 14px; background: #fff;
+    border: 1px solid #ddd; border-radius: 20px;
+    cursor: pointer; white-space: nowrap;
+}
+.pe-unknown-btn:hover { border-color: #e74c3c; color: #e74c3c; }
+.pe-unknown-active { color: #e74c3c !important; border-color: #e74c3c !important; background: #fef0ef !important; font-weight: 600; }
+.pe-death-age { font-size: 14px; font-weight: 600; color: #e74c3c; margin-top: 8px; padding: 4px 10px; background: #fef0ef; border-radius: 6px; }
+
+/* 其他图片 */
+.pe-other-image-section { padding: 14px; }
+.pe-other-image-box { display: flex; flex-wrap: wrap; gap: 10px; }
+.pe-other-thumb-wrap {
+    position: relative; width: 100px; height: 100px;
+    border-radius: 8px; overflow: hidden; border: 1px solid #e0e0e0;
+}
+.pe-other-thumb { width: 100%; height: 100%; object-fit: cover; }
+.pe-thumb-remove {
+    position: absolute; top: -4px; right: -4px;
+    width: 20px; height: 20px; line-height: 20px;
+    background: rgba(231,76,60,0.9); color: #fff;
+    border-radius: 50%; text-align: center; font-size: 12px;
+    cursor: pointer;
+}
+.pe-other-add {
+    width: 100px; height: 100px; border: 2px dashed #ccc;
+    border-radius: 8px; display: flex; align-items: center;
+    justify-content: center; background: #fafafa; cursor: pointer;
+}
+.pe-other-add:hover { border-color: #667eea; }
+.pe-other-add-icon { font-size: 32px; color: #bbb; font-weight: bold; }
+
+/* 籍贯/排序/居住地 */
+.pe-info-grid { padding: 14px 18px; }
+.pe-info-row {
+    display: flex; align-items: center; padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+.pe-info-row:last-child { border-bottom: none; }
+
+/* 文本区 */
+.pe-textarea {
+    width: 100%; min-height: 100px; font-size: 14px; color: #333;
+    background: #f8f9fa; border-radius: 8px; padding: 10px;
+    box-sizing: border-box; border: 1px solid #e9ecef; resize: vertical;
+    outline: none; font-family: inherit;
+}
+.pe-textarea:focus { border-color: #667eea; }
+.pe-textarea-sm { min-height: 40px; height: 40px; }
+
+/* 底部区域 */
+.pe-bottom-area { padding: 12px 0; }
+
+/* 配偶开关行 */
+.pe-spouse-toggle-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 16px; padding: 14px 16px;
+    background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%);
+    border-radius: 12px;
+}
+.pe-spouse-toggle-label { font-size: 15px; font-weight: bold; color: #c2185b; flex: 1; }
+.pe-label-disabled { color: #bbb; }
+.pe-spouse-toggle-status { font-size: 12px; color: #ad1457; }
+
+/* 提交按钮 */
+.pe-submit-btn {
+    width: 100%; height: 48px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff; border: none; border-radius: 24px;
+    font-size: 16px; font-weight: 600;
+    box-shadow: 0 4px 16px rgba(102,126,234,0.3);
+    cursor: pointer;
+}
+.pe-submit-btn:hover { opacity: 0.9; }
+.pe-submit-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+
+/* 配偶面板 */
+.pe-spouse-panel { margin-top: 12px; }
+.pe-spouse-divider {
+    text-align: center; font-size: 13px; color: #e91e63;
+    padding: 10px 0 6px; font-weight: 500;
+}
+.pe-spouse-card { border: 1px solid #f8bbd0; }
+.pe-spouse-card .pe-section-header { color: #c2185b; border-bottom-color: #f8bbd0; }
+
+/* ═══ 人员编辑响应式 ═══ */
+@media (min-width: 768px) {
+    .pe-scroll-content { max-width: 720px; margin: 0 auto; padding: 16px 20px 80px; }
+    .pe-avatar-box { width: 140px; height: 140px; }
+    .pe-name-fields { min-height: 140px; }
+    .pe-name-input-wrap { max-width: 180px; }
+    .pe-gen-input-wrap { max-width: 80px; }
+    .pe-other-thumb-wrap { width: 130px; height: 130px; }
+    .pe-other-add { width: 130px; height: 130px; }
+}
