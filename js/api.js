@@ -1,5 +1,6 @@
 /**
  * API封装层 - 与后端 Cloudflare Workers API 完全对齐
+ * 与小程序 miniprogram/utils/api.ts 功能100%对齐
  * 基础地址: https://syliwoks.fekepj.com/api
  */
 
@@ -7,11 +8,14 @@ const API_BASE_URL = 'https://syliwoks.fekepj.com/api';
 const TOKEN_KEY = 'token';
 const USER_KEY = 'userInfo';
 const GUEST_ID_KEY = 'guest_id';
+const MAX_RETRIES = 3; // 最大重试次数
+const BASE_RETRY_DELAY_MS = 1500; // 基础重试间隔（毫秒），后续指数增长
 
-// ====== 请求去重 ======
+// ====== 请求去重：防止同一URL+Method并发重复请求 ======
 const pendingRequests = {};
 
-// ====== 本地缓存（API失败时兜底） ======
+// ====== 本地缓存：API失败时用缓存数据兜底 ======
+// ★ 缓存key包含用户角色，防止不同权限的用户互相读到缓存数据
 function getCacheKey(url, method) {
   const userInfo = getCurrentUserInfo();
   const role = userInfo?.role || 'guest';
@@ -28,13 +32,14 @@ function getApiCache(url, method) {
   try {
     const cached = JSON.parse(localStorage.getItem(getCacheKey(url, method)));
     if (cached && cached.data) {
+      // 缓存有效期5分钟
       if (Date.now() - cached.time < 5 * 60 * 1000) return cached.data;
     }
   } catch (e) { /* ignore */ }
   return null;
 }
 
-/** 清除所有API缓存（登录/退出时调用） */
+/** 清除所有API缓存（登录/退出时调用，防止不同用户读到旧缓存） */
 function clearApiCache() {
   try {
     const keys = Object.keys(localStorage);
@@ -65,6 +70,7 @@ class ZupuAPI {
       method,
       headers: {
         'Content-Type': 'application/json',
+        // 标准Authorization Bearer格式（后端主要从此处取token）
         'Authorization': this.token ? `Bearer ${this.token}` : ''
       }
     };
@@ -86,8 +92,11 @@ class ZupuAPI {
       if (queryString) finalUrl += '?' + queryString;
     }
 
-    // 去重
-    const dedupeKey = `${method}:${url}`;
+    // ★ 去重：同一请求如果正在pending，直接复用Promise
+    // 对于GET请求，data已合并到URL查询参数中，所以用URL去重即可
+    // 对于非GET请求，不同data不应去重，所以用URL+Method+data摘要去重
+    const dataDigest = (method !== 'GET' && data) ? `:${JSON.stringify(data)}` : '';
+    const dedupeKey = `${method}:${url}${dataDigest}`;
     if (pendingRequests[dedupeKey]) {
       return pendingRequests[dedupeKey];
     }
@@ -95,17 +104,21 @@ class ZupuAPI {
     const requestPromise = (async () => {
       try {
         let lastError = null;
-        for (let attempt = 1; attempt <= 3; attempt++) {
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
           try {
             const res = await fetch(finalUrl, options);
 
             if (res.status === 401) {
+              // ★ 游客不处理401（游客无token，/me等接口必然401，不应跳走）
               const userInfo = getCurrentUserInfo();
               const isGuestUser = userInfo && userInfo.role === 'guest';
               if (isGuestUser) {
+                // 游客遇到401，静默忽略，不清除状态
                 return { status: 'error', message: '游客无权限访问此接口', data: null };
               }
+              // 非游客：清除登录态并跳转登录页
               this.clearToken();
+              clearApiCache();
               window.location.hash = '#/login';
               throw new Error('登录已过期');
             }
@@ -113,22 +126,30 @@ class ZupuAPI {
             const json = await res.json();
 
             if (res.status === 200) {
+              // GET请求成功后写入缓存
               if (method === 'GET') setApiCache(url, method, json);
               return json;
             }
 
-            throw new Error(json.message || `请求失败: HTTP ${res.status}`);
+            // 提取服务端返回的错误详情
+            const errMsg = json.message || `请求失败: HTTP ${res.status}`;
+            throw new Error(errMsg);
           } catch (error) {
             lastError = error;
+            // 网络层面的连接关闭/超时错误才重试，业务错误不重试
             const isNetworkError = error.message && (
               error.message.includes('Failed to fetch') ||
               error.message.includes('NetworkError') ||
-              error.message.includes('timeout')
+              error.message.includes('timeout') ||
+              error.message.includes('ERR_CONNECTION_CLOSED')
             );
-            if (isNetworkError && attempt < 3) {
-              await new Promise(r => setTimeout(r, 1500 * attempt));
+            if (isNetworkError && attempt < MAX_RETRIES) {
+              // 指数退避：1.5s → 3s → 4.5s
+              const delayMs = BASE_RETRY_DELAY_MS * attempt;
+              await new Promise(r => setTimeout(r, delayMs));
               continue;
             }
+            // 非网络错误或已达最大重试次数，检查是否有可用缓存
             const cached = getApiCache(url, method);
             if (cached !== null) return cached;
             throw error;
@@ -136,6 +157,7 @@ class ZupuAPI {
         }
         throw lastError;
       } finally {
+        // 请求完成（无论成功失败），从去重表中移除
         delete pendingRequests[dedupeKey];
       }
     })();
@@ -295,12 +317,15 @@ class ZupuAPI {
     return this.request('/messages', 'GET');
   }
 
-  async createMessage(content) {
+  async createMessage(content, imageUrls) {
     const userInfo = getCurrentUserInfo();
     const isGuestUser = userInfo && userInfo.role === 'guest';
     const data = { content };
     if (isGuestUser) {
       data.guest_id = localStorage.getItem(GUEST_ID_KEY) || '';
+    }
+    if (imageUrls && imageUrls.length > 0) {
+      data.image_urls = imageUrls;
     }
     return this.request('/messages', 'POST', data);
   }
@@ -333,8 +358,13 @@ class ZupuAPI {
     return this.request('/announcements', 'GET', params);
   }
 
-  async createAnnouncement(content, pages, scrollDuration) {
-    return this.request('/announcements', 'POST', { content, pages, scroll_duration: scrollDuration || 8 });
+  async createAnnouncement(content, pages, scrollDuration, scrollEnabled) {
+    return this.request('/announcements', 'POST', {
+      content,
+      pages,
+      scroll_duration: scrollDuration || 8,
+      scroll_enabled: scrollEnabled !== undefined ? scrollEnabled : 1
+    });
   }
 
   async updateAnnouncement(id, data) {
@@ -351,8 +381,8 @@ class ZupuAPI {
     return this.request('/worship/ancestors', 'GET');
   }
 
-  async offerIncense(ancestorId, count) {
-    return this.request('/worship/offer-incense', 'POST', { ancestor_id: ancestorId, count: count || 1 });
+  async offerIncense(ancestorId, count = 1) {
+    return this.request('/worship/offer-incense', 'POST', { ancestor_id: ancestorId, count });
   }
 
   async getWorshipConfig() {
@@ -388,6 +418,10 @@ class ZupuAPI {
 
   async getWorshipLogs() {
     return this.request('/worship/logs', 'GET');
+  }
+
+  async getWorshipRecentRecords(limit) {
+    return this.request('/worship/recent-records', 'GET', { limit: limit || 50 });
   }
 
   // ═══ 设置 ═══
@@ -477,14 +511,63 @@ function getOrCreateGuestId() {
   return guestId;
 }
 
-/** 获取或创建设备ID */
+/** 获取或创建设备ID（与后端 wx_device_id 对齐，浏览器指纹+时间戳生成） */
 function getOrCreateDeviceId() {
-  let deviceId = localStorage.getItem('web_device_id') || '';
+  let deviceId = localStorage.getItem('wx_device_id') || '';
   if (!deviceId) {
     const timestamp = Date.now().toString(36);
     const random = Math.random().toString(36).slice(2, 10);
     deviceId = `web_${timestamp}_${random}`;
-    localStorage.setItem('web_device_id', deviceId);
+    localStorage.setItem('wx_device_id', deviceId);
   }
   return deviceId;
 }
+
+/** 公告变量模板渲染
+ * 支持的变量：{{username}} 用户昵称, {{li_shi_id}} 李氏号, {{person_name}} 绑定人名, {{generation}} 字辈, {{shi_xi}} 世系
+ * 与小程序 renderAnnouncementTemplate 逻辑一致
+ */
+function renderAnnouncementTemplate(content) {
+  if (!content) return '';
+  const userInfo = getCurrentUserInfo() || {};
+  const replacements = {
+    'username': userInfo.nickname || userInfo.displayName || userInfo.username || '用户',
+    'li_shi_id': userInfo.li_shi_id || '未分配',
+    'person_name': userInfo.personName || userInfo.person_name || '',
+    'generation': userInfo.generation || '',
+    'shi_xi': userInfo.shi_xi ? `${userInfo.shi_xi}世` : '',
+  };
+  return content.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+    return replacements[key] !== undefined ? replacements[key] : match;
+  });
+}
+
+/** 上传留言图片（网页端File对象上传） */
+async function uploadMessageImage(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('file_type', 'messages');
+  const token = localStorage.getItem(TOKEN_KEY);
+  try {
+    const res = await fetch(API_BASE_URL + '/upload', {
+      method: 'POST',
+      headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+      body: formData
+    });
+    const json = await res.json();
+    if (json.status === 'success') return json.url;
+    throw new Error(json.message || '上传失败');
+  } catch (e) {
+    throw new Error(e.message || '上传失败');
+  }
+}
+
+// ═══ 关键存储键汇总 ═══
+// token          — JWT令牌
+// userInfo       — 用户信息对象（role/nickname/personId/li_shi_id/loginType等）
+// guest_id       — 游客ID（格式: guest_时间戳_随机数）
+// wx_device_id   — 设备ID（格式: web_时间戳_随机数）
+// last_wx_li_shi_id    — 上次微信登录李氏号
+// last_wx_nickname     — 上次微信昵称
+// last_wx_avatar_url   — 上次微信头像URL
+// bind_token     — 分享绑定令牌

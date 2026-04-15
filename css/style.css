@@ -5,26 +5,66 @@
 }
 
 :root {
+    /* ═══ 主色系 ═══ */
     --primary: #4a90d9;
     --primary-dark: #3a7bc8;
     --primary-light: #e8f0f8;
     --success: #10b981;
     --success-dark: #059669;
+    --success-light: #d1fae5;
     --danger: #ef4444;
     --danger-dark: #dc2626;
+    --danger-light: #fee2e2;
     --warning: #f59e0b;
+    --warning-light: #fef3c7;
+    --info: #3b82f6;
+    --info-light: #dbeafe;
+
+    /* ═══ 背景色 ═══ */
     --bg-main: #f5f7fa;
     --bg-card: #ffffff;
     --bg-header: #ffffff;
+    --bg-sidebar: #ffffff;
+
+    /* ═══ 文字色 ═══ */
     --text-primary: #1f2937;
     --text-secondary: #6b7280;
     --text-muted: #9ca3af;
+    --text-white: #ffffff;
+
+    /* ═══ 边框/阴影/圆角 ═══ */
     --border-color: #e5e7eb;
     --border-light: #f3f4f6;
     --shadow: 0 2px 8px rgba(0,0,0,0.08);
     --shadow-lg: 0 4px 16px rgba(0,0,0,0.12);
     --radius: 8px;
     --radius-lg: 12px;
+    --radius-sm: 4px;
+    --radius-full: 9999px;
+
+    /* ═══ 角色标签色 ═══ */
+    --role-guest: #9ca3af;
+    --role-guest-bg: #f3f4f6;
+    --role-user: #6b7280;
+    --role-user-bg: #f3f4f6;
+    --role-member: #059669;
+    --role-member-bg: #d1fae5;
+    --role-admin: #1e40af;
+    --role-admin-bg: #dbeafe;
+    --role-super-admin: #92400e;
+    --role-super-admin-bg: #fef3c7;
+
+    /* ═══ 性别头像色 ═══ */
+    --avatar-male-bg: #D6EAFF;
+    --avatar-male-fg: #4A9EDE;
+    --avatar-female-bg: #FFD6E8;
+    --avatar-female-fg: #E85A9A;
+
+    /* ═══ 布局尺寸 ═══ */
+    --sidebar-width: 240px;
+    --header-height: 56px;
+    --tab-bar-height: 56px;
+    --content-max-width: 1200px;
 }
 
 body {
@@ -37,6 +77,212 @@ body {
 
 .hidden { display: none !important; }
 .page { min-height: 100vh; }
+
+/* ═══ SVG默认头像样式（性别头像组件） ═══ */
+.gender-avatar {
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+.gender-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+.gender-avatar.male { background: var(--avatar-male-bg); color: var(--avatar-male-fg); }
+.gender-avatar.female { background: var(--avatar-female-bg); color: var(--avatar-female-fg); }
+.gender-avatar.guest-hidden { background: var(--avatar-male-bg); color: var(--avatar-male-fg); }
+
+/* ═══ 底部Tab栏（手机端） ═══ */
+.bottom-tab-bar {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: var(--tab-bar-height);
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-color);
+    z-index: 500;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.bottom-tab-bar .tab-list {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    height: 100%;
+    list-style: none;
+}
+.bottom-tab-bar .tab-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--text-muted);
+    transition: color 0.2s;
+    text-decoration: none;
+    position: relative;
+    padding: 4px 12px;
+}
+.bottom-tab-bar .tab-item i { font-size: 20px; }
+.bottom-tab-bar .tab-item.active { color: var(--primary); }
+.bottom-tab-bar .tab-item .tab-badge {
+    position: absolute;
+    top: 0;
+    right: 4px;
+    background: var(--danger);
+    color: white;
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: var(--radius-full);
+    min-width: 16px;
+    text-align: center;
+    line-height: 1.3;
+}
+
+/* ═══ 电脑端布局 ═══ */
+.desktop-layout {
+    display: flex;
+    min-height: 100vh;
+}
+.desktop-sidebar {
+    width: var(--sidebar-width);
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border-color);
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    overflow-y: auto;
+    z-index: 100;
+    transition: transform 0.3s;
+}
+.desktop-sidebar .sidebar-brand {
+    padding: 20px 16px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--primary);
+    text-align: center;
+}
+.desktop-sidebar .sidebar-nav { list-style: none; padding: 8px 0; }
+.desktop-sidebar .sidebar-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+    color: var(--text-secondary);
+    border-left: 3px solid transparent;
+}
+.desktop-sidebar .sidebar-nav-item:hover { background: var(--bg-main); color: var(--text-primary); }
+.desktop-sidebar .sidebar-nav-item.active { background: var(--primary-light); color: var(--primary); border-left-color: var(--primary); font-weight: 500; }
+.desktop-sidebar .sidebar-nav-item i { width: 20px; text-align: center; font-size: 16px; }
+.desktop-sidebar .sidebar-nav-item .nav-badge {
+    margin-left: auto;
+    background: var(--danger);
+    color: white;
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+}
+.desktop-main {
+    flex: 1;
+    margin-left: var(--sidebar-width);
+    min-height: 100vh;
+    padding: 20px;
+    max-width: calc(100vw - var(--sidebar-width));
+}
+
+/* ═══ 公告滚动栏 ═══ */
+.announcement-bar {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--warning-light);
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+    gap: 8px;
+    cursor: pointer;
+    overflow: hidden;
+}
+.announcement-bar .ann-icon { flex-shrink: 0; font-size: 16px; color: var(--warning); }
+.announcement-bar .ann-scroll-area { flex: 1; overflow: hidden; position: relative; }
+.announcement-bar .ann-text {
+    font-size: 13px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    display: inline-block;
+}
+.announcement-bar .ann-text.ann-scrolling {
+    animation: annScroll 8s linear infinite;
+}
+@keyframes annScroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+}
+.announcement-bar .ann-dots {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+.announcement-bar .ann-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    opacity: 0.4;
+    transition: all 0.3s;
+}
+.announcement-bar .ann-dot.active { opacity: 1; background: var(--warning); }
+
+/* ═══ 我的页面 ═══ */
+.me-profile-card { text-align: center; }
+.me-profile-top { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.me-avatar-img, .me-avatar-default {
+    width: 64px; height: 64px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
+}
+.me-avatar-img { object-fit: cover; border: 2px solid var(--border-color); }
+.me-avatar-default {
+    background: var(--avatar-male-bg); color: var(--avatar-male-fg);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; font-weight: 600;
+}
+.me-profile-info { flex: 1; text-align: left; }
+.me-name-row { display: flex; align-items: center; gap: 8px; }
+.me-name { font-size: 18px; font-weight: 600; color: var(--text-primary); }
+.me-name-edit { color: var(--text-muted); cursor: pointer; font-size: 14px; }
+.me-name-edit:hover { color: var(--primary); }
+.me-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.me-info-item { font-size: 13px; }
+.me-info-label { color: var(--text-muted); margin-right: 6px; }
+.me-info-value { color: var(--text-primary); }
+
+.me-status-card {
+    display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+}
+.me-status-icon { font-size: 24px; flex-shrink: 0; }
+.me-status-text { font-size: 13px; color: var(--text-secondary); }
+.me-status-unverified { background: var(--warning-light); border-left: 3px solid var(--warning); }
+.me-status-verified { background: var(--success-light); border-left: 3px solid var(--success); }
+
+.me-actions-card { display: flex; flex-direction: column; gap: 8px; }
+.me-action-btn { text-align: left; justify-content: flex-start; }
+.me-logout-btn { color: var(--danger) !important; border-color: var(--danger) !important; }
+.me-hint-text { font-size: 12px; color: var(--text-muted); text-align: center; padding: 4px 0; }
+
+.me-desc-content { font-size: 14px; color: var(--text-secondary); line-height: 1.8; white-space: pre-wrap; }
+.me-about-card .me-about-info { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-secondary); }
 
 .btn {
     display: inline-flex;
@@ -112,6 +358,82 @@ body {
 }
 .login-form input:focus { outline: none; border-color: var(--primary); }
 .login-hint { text-align: center; margin-top: 16px; color: var(--text-secondary); font-size: 13px; }
+
+/* 登录Tab切换（手机端） */
+.login-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--border-color);
+}
+.login-tab {
+    flex: 1;
+    padding: 10px;
+    background: none;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+    text-align: center;
+}
+.login-tab:hover { color: var(--primary); }
+.login-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 500; }
+
+/* 登录区内容（电脑端横向分栏） */
+.login-body {
+    display: flex;
+    gap: 24px;
+    align-items: stretch;
+}
+.login-divider {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    position: relative;
+    padding: 0 8px;
+}
+.login-divider::before,
+.login-divider::after {
+    content: '';
+    position: absolute;
+    width: 1px;
+    background: var(--border-color);
+    left: 50%;
+}
+.login-divider::before { top: 0; bottom: 55%; }
+.login-divider::after { top: 45%; bottom: 0; }
+
+/* 微信扫码样式 */
+.wechat-qr-container { text-align: center; }
+.wechat-qr-placeholder { padding: 20px; }
+.wechat-icon-lg { font-size: 48px; color: #07c160; margin-bottom: 12px; }
+.btn-wechat { background: #07c160; color: white; border: none; padding: 10px 20px; border-radius: var(--radius); cursor: pointer; font-size: 14px; margin-top: 12px; }
+.btn-wechat:hover { background: #06ad56; }
+
+/* 电脑端：登录页左右分栏 */
+@media (min-width: 768px) {
+    .login-container { max-width: 780px; padding: 40px; }
+    .login-tabs { display: none; }
+    .login-divider { display: flex; }
+    .login-body .login-tab-content { flex: 1; }
+    .login-body .login-tab-content.active { display: block; }
+    .login-body .login-tab-content:not(.active) { display: block; }
+}
+
+/* 手机端：登录Tab切换 */
+@media (max-width: 767px) {
+    .login-container { margin: 20px auto; padding: 30px 20px; }
+    .login-body { flex-direction: column; }
+    .login-tabs { display: flex; }
+    .login-divider { display: none; }
+    .login-body .login-tab-content:not(.active) { display: none; }
+}
 
 .header {
     background: var(--bg-header);
@@ -333,10 +655,30 @@ body {
     font-size: 11px;
     font-weight: 500;
 }
-.badge-alive { background: #d1fae5; color: #065f46; }
-.badge-deceased { background: #fee2e2; color: #991b1b; }
+.badge-alive { background: var(--success-light); color: #065f46; }
+.badge-deceased { background: var(--danger-light); color: #991b1b; }
 .badge-married { background: #dbeafe; color: #1e40af; }
 .badge-unmarried { background: #f3f4f6; color: #6b7280; }
+
+/* 角色标签（5种颜色区分） */
+.role-tag { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; display: inline-block; }
+.role-tag-guest { background: var(--role-guest-bg); color: var(--role-guest); }
+.role-tag-user { background: var(--role-user-bg); color: var(--role-user); }
+.role-tag-member { background: var(--role-member-bg); color: var(--role-member); }
+.role-tag-admin { background: var(--role-admin-bg); color: var(--role-admin); }
+.role-tag-super_admin { background: var(--role-super-admin-bg); color: var(--role-super-admin); }
+.role-tag-small { padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 500; }
+
+/* 健在/已逝小圆点 */
+.alive-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+.alive-dot.alive { background: var(--success); }
+.alive-dot.dead { background: var(--text-muted); }
 .person-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid var(--border-light); font-size: 12px; color: var(--text-muted); }
 
 .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 20px; }
@@ -487,9 +829,11 @@ body {
 .user-details h4 { font-size: 15px; color: var(--text-primary); margin-bottom: 4px; }
 .user-details p { font-size: 13px; color: var(--text-muted); }
 .user-role { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
-.role-super { background: #fef3c7; color: #92400e; }
-.role-admin { background: #dbeafe; color: #1e40af; }
-.role-user { background: #f3f4f6; color: #6b7280; }
+.role-super { background: var(--role-super-admin-bg); color: var(--role-super-admin); }
+.role-admin { background: var(--role-admin-bg); color: var(--role-admin); }
+.role-member { background: var(--role-member-bg); color: var(--role-member); }
+.role-user { background: var(--role-user-bg); color: var(--role-user); }
+.role-guest { background: var(--role-guest-bg); color: var(--role-guest); }
 .user-actions { display: flex; gap: 8px; }
 
 .import-area { text-align: center; padding: 30px 0; }
@@ -532,10 +876,6 @@ body {
 }
 .modal-overlay.show { opacity: 1; visibility: visible; }
 .modal {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
     background: var(--bg-card);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
@@ -682,6 +1022,91 @@ body {
     .people-list { grid-template-columns: 1fr; }
     .gen-grid { grid-template-columns: 1fr; }
     .login-container { margin: 20px auto; padding: 30px 20px; }
-    .modal { width: 95%; max-height: 95vh; }
     .detail-grid { grid-template-columns: 1fr; }
+
+    /* 手机端：隐藏电脑侧边栏，显示底部Tab */
+    .desktop-sidebar { display: none; }
+    .desktop-main { margin-left: 0; max-width: 100vw; }
+    .bottom-tab-bar { display: block; }
+
+    /* 手机端：内容区留出底部Tab空间 */
+    .main-content, .desktop-main { padding-bottom: calc(var(--tab-bar-height) + 16px); }
+
+    /* 手机端：Modal改为底部弹出Sheet */
+    .modal {
+        position: fixed;
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        transform: none;
+        width: 100%;
+        max-width: 100%;
+        max-height: 85vh;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        animation: slideUp 0.3s ease;
+    }
+    .modal.show { transform: none; }
+    .modal-overlay { align-items: flex-end; }
+}
+
+@keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+/* ═══ 电脑端（≥768px） ═══ */
+@media (min-width: 768px) {
+    .bottom-tab-bar { display: none; }
+    .mobile-only { display: none !important; }
+    /* 手机端弹出sidebar隐藏，电脑端固定sidebar */
+    .sidebar { display: none; }
+    .overlay { display: none; }
+    /* 电脑端：Modal居中弹窗 */
+    .modal {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+}
+
+/* ═══ 手机端（<768px） ═══ */
+@media (max-width: 767px) {
+    .desktop-only { display: none !important; }
+    .sidebar {
+        position: fixed;
+        left: -280px;
+        top: 0;
+        width: 280px;
+        height: 100vh;
+        background: var(--bg-card);
+        box-shadow: var(--shadow-lg);
+        z-index: 1000;
+        transition: left 0.3s;
+        overflow-y: auto;
+        display: block;
+    }
+    .sidebar.open { left: 0; }
+    .overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 999;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s;
+    }
+    .overlay.show { opacity: 1; visibility: visible; }
+}
+
+/* ═══ 大屏（≥1200px） ═══ */
+@media (min-width: 1200px) {
+    .desktop-main { max-width: var(--content-max-width); margin-left: var(--sidebar-width); }
+    .stats-grid { grid-template-columns: repeat(4, 1fr); }
+    .gen-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+    .people-list { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
 }

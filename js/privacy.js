@@ -182,6 +182,50 @@ function getAvatarText(person) {
 
 /** 获取世系文字 */
 function getGenerationText(shiXi) {
-  if (!shiXi && shiXi !== 0) return '';
-  return `第${shiXi}世`;
+    if (!shiXi && shiXi !== 0) return '';
+    return `第${shiXi}世`;
+}
+
+/**
+ * 获取默认头像URL（内联SVG data URI）
+ * 男性：蓝底深蓝剪影 / 女性：粉底深粉剪影
+ * 与小程序 gender-avatar 组件逻辑一致
+ */
+function getDefaultAvatarUrl(gender) {
+    const isFemale = gender === '女';
+    const bg = isFemale ? '%23FFD6E8' : '%23D6EAFF';
+    const fg = isFemale ? '%23E85A9A' : '%234A9EDE';
+
+    // 简化人形剪影SVG
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        <rect width="100" height="100" rx="50" fill="${bg}"/>
+        <circle cx="50" cy="35" r="16" fill="${fg}"/>
+        <ellipse cx="50" cy="78" rx="26" ry="22" fill="${fg}"/>
+    </svg>`;
+
+    return `data:image/svg+xml,${svg.replace(/\n/g, '').replace(/\s+/g, ' ')}`;
+}
+
+/**
+ * 渲染性别头像HTML（与小程序 gender-avatar 组件对齐）
+ * @param {Object} person - 人员对象
+ * @param {string} className - CSS类名
+ * @param {number} size - 尺寸px
+ * @returns {string} HTML字符串
+ */
+function renderGenderAvatarHtml(person, className, size) {
+    size = size || 40;
+    const role = getCurrentRole();
+    const isGuestMode = role === 'guest';
+    const hasAvatar = person.avatar && !isGuestMode;
+
+    if (hasAvatar) {
+        return `<img class="gender-avatar ${className || ''}" src="${person.avatar}" alt="" style="width:${size}px;height:${size}px;">`;
+    }
+
+    const isFemale = person.gender === '女';
+    const genderClass = isFemale ? 'female' : 'male';
+    const initial = (person.name || '未')[0];
+
+    return `<div class="gender-avatar ${genderClass} ${className || ''}" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.45)}px;">${initial}</div>`;
 }

@@ -1,331 +1,538 @@
+/**
+ * 上院李十七世族谱 - 网页端主应用
+ * 与小程序功能100%对齐
+ */
+
 class ZupuApp {
     constructor() {
         this.currentUser = null;
         this.peopleData = [];
         this.peopleDict = {};
-        this.selectedPerson = null;
         this.selectedTreePerson = null;
         this.selectedBaotaPerson = null;
         this.treeZoom = 100;
         this.baotaZoom = 100;
-        this.currentGen = 17;
         this.treeMode = 'vertical';
         this.isDragging = false;
-        this.dragStartX = 0;
-        this.dragStartY = 0;
-        this.scrollStartX = 0;
-        this.scrollStartY = 0;
+        this.dragStartX = 0; this.dragStartY = 0;
+        this.scrollStartX = 0; this.scrollStartY = 0;
+        this.annTimers = {};
+        this.annCurrentIndex = {};
+        this.peopleFilters = { hideDead: false, hideFemale: false, onlyAfter17: false };
+        this.adminAccounts = [];
+        this.adminFilter = 'all';
+        this.adminLoginSortDir = 0;
+        this.adminSelectedIds = new Set();
+        this.worshipAncestors = [];
+        this.worshipFilterShiXi = 0;
+        this.worshipSortMode = 'default';
+        this.worshipBurning = false;
+        this.worshipBurnSeq = 0;
+        this.worshipLiveRankTimer = null;
+        this.homeUnreadCount = 0;
+        this._navParams = {};
+        this._msgImageUrls = [];
         this.init();
     }
 
-    init() {
-        this.bindEvents();
-        this.checkLogin();
-    }
+    init() { this.bindEvents(); this.checkLogin(); }
 
     bindEvents() {
-        document.getElementById('login-btn')?.addEventListener('click', () => this.login());
-        document.getElementById('guest-btn')?.addEventListener('click', () => this.guestLogin());
-        document.getElementById('login-password')?.addEventListener('keypress', e => e.key === 'Enter' && this.login());
-        document.getElementById('logout-btn')?.addEventListener('click', () => this.logout());
-        document.getElementById('menu-toggle')?.addEventListener('click', () => this.toggleSidebar());
-        document.getElementById('sidebar-close')?.addEventListener('click', () => this.closeSidebar());
-        document.getElementById('overlay')?.addEventListener('click', () => this.closeSidebar());
-
-        document.querySelectorAll('.menu-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const page = item.dataset.page;
-                if (page) this.navigateTo(page);
+        const $ = id => document.getElementById(id);
+        // 登录
+        $('login-btn')?.addEventListener('click', () => this.login());
+        $('guest-btn')?.addEventListener('click', () => this.guestLogin());
+        $('login-password')?.addEventListener('keypress', e => e.key === 'Enter' && this.login());
+        $('get-qr-btn')?.addEventListener('click', () => this.initWechatLogin());
+        document.querySelectorAll('.login-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.login-tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(`login-${tab.dataset.tab}`)?.classList.add('active');
             });
         });
-
-        document.getElementById('people-search')?.addEventListener('input', e => this.filterPeople());
-        document.getElementById('people-filter')?.addEventListener('change', () => this.filterPeople());
-        document.getElementById('add-person-btn')?.addEventListener('click', () => this.openAddPersonModal());
-
-        document.querySelectorAll('.modal-close').forEach(btn => {
-            btn.addEventListener('click', () => this.closeAllModals());
+        // 电脑端登录区两个同时显示，手机端Tab切换
+        this._updateLoginLayout();
+        window.addEventListener('resize', () => this._updateLoginLayout());
+        // 侧边栏
+        $('menu-toggle')?.addEventListener('click', () => this.toggleSidebar());
+        $('sidebar-close')?.addEventListener('click', () => this.closeSidebar());
+        $('overlay')?.addEventListener('click', () => this.closeSidebar());
+        // 菜单
+        document.querySelectorAll('.menu-item').forEach(item => item.addEventListener('click', () => item.dataset.page && this.navigateTo(item.dataset.page)));
+        document.querySelectorAll('.tab-item').forEach(tab => tab.addEventListener('click', () => tab.dataset.page && this.navigateTo(tab.dataset.page)));
+        // 人员列表
+        $('people-search')?.addEventListener('input', () => this.filterPeople());
+        // 世系图
+        $('tree-zoom-in')?.addEventListener('click', () => this.zoomTree(10));
+        $('tree-zoom-out')?.addEventListener('click', () => this.zoomTree(-10));
+        $('tree-reset')?.addEventListener('click', () => this.resetTreeZoom());
+        $('tree-mode-vertical')?.addEventListener('click', () => this.setTreeMode('vertical'));
+        $('tree-mode-horizontal')?.addEventListener('click', () => this.setTreeMode('horizontal'));
+        $('close-tree-panel')?.addEventListener('click', () => this.closeTreePanel());
+        $('btn-add-father')?.addEventListener('click', () => this.addRelative('father'));
+        $('btn-add-son')?.addEventListener('click', () => this.addRelative('son'));
+        $('btn-add-spouse')?.addEventListener('click', () => this.addRelative('spouse'));
+        $('btn-add-sibling')?.addEventListener('click', () => this.addRelative('sibling'));
+        $('btn-edit-person')?.addEventListener('click', () => this.editSelectedTreePerson());
+        $('btn-view-person')?.addEventListener('click', () => this.viewSelectedTreePerson());
+        // 宝塔树
+        $('baota-zoom-in')?.addEventListener('click', () => this.zoomBaota(10));
+        $('baota-zoom-out')?.addEventListener('click', () => this.zoomBaota(-10));
+        $('baota-reset')?.addEventListener('click', () => this.resetBaotaZoom());
+        $('show-before-17')?.addEventListener('change', e => this.loadBaota(e.target.checked));
+        $('close-baota-panel')?.addEventListener('click', () => this.closeBaotaPanel());
+        $('baota-btn-add-son')?.addEventListener('click', () => this.addBaotaRelative('son'));
+        $('baota-btn-add-spouse')?.addEventListener('click', () => this.addBaotaRelative('spouse'));
+        $('baota-btn-edit-person')?.addEventListener('click', () => this.editSelectedBaotaPerson());
+        $('baota-btn-view-person')?.addEventListener('click', () => this.viewSelectedBaotaPerson());
+        $('baota-btn-bind-person')?.addEventListener('click', () => this.bindSelectedBaotaPerson());
+        // 留言
+        $('msg-compose-input')?.addEventListener('input', e => { $('msg-char-count').textContent = `${e.target.value.length}/500`; });
+        $('msg-submit-btn')?.addEventListener('click', () => this.submitMessage());
+        $('msg-clear-all-btn')?.addEventListener('click', () => this.clearAllMessages());
+        $('msg-img-btn')?.addEventListener('click', () => $('msg-img-input')?.click());
+        $('msg-img-input')?.addEventListener('change', e => this.handleMessageImage(e));
+        // 公告
+        $('add-announcement-btn')?.addEventListener('click', () => this.openAnnouncementEditor());
+        // 帐号管理
+        $('admin-search')?.addEventListener('input', () => this.filterAdminAccounts());
+        document.querySelectorAll('.admin-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                const filter = tab.dataset.filter;
+                if (filter === 'login_sort') { this.adminLoginSortDir = (this.adminLoginSortDir % 2) + 1; }
+                else { this.adminFilter = filter; this.adminLoginSortDir = 0; }
+                this.filterAdminAccounts();
+            });
         });
-        document.getElementById('person-cancel')?.addEventListener('click', () => this.closeModal('person-modal'));
-        document.getElementById('person-save')?.addEventListener('click', () => this.savePerson());
-        document.getElementById('user-cancel')?.addEventListener('click', () => this.closeModal('user-modal'));
-        document.getElementById('user-save')?.addEventListener('click', () => this.saveUser());
-        document.getElementById('add-user-btn')?.addEventListener('click', () => this.openAddUserModal());
-        document.getElementById('detail-close-btn')?.addEventListener('click', () => this.closeModal('detail-modal'));
-        document.getElementById('detail-edit-btn')?.addEventListener('click', () => this.editPersonFromDetail());
-        document.getElementById('confirm-cancel')?.addEventListener('click', () => this.closeModal('confirm-modal'));
-
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', e => this.switchTab(e.target));
+        $('batch-verify-btn')?.addEventListener('click', () => this.batchVerify());
+        $('batch-delete-btn')?.addEventListener('click', () => this.batchDeleteUsers());
+        $('batch-role-btn')?.addEventListener('click', () => this.batchChangeRole());
+        // 祭拜筛选
+        document.querySelectorAll('.worship-filter-bar .filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.worship-filter-bar .filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.worshipFilterShiXi = parseInt(btn.dataset.shixi);
+                this.filterWorshipAncestors();
+            });
         });
-
-        document.getElementById('tree-zoom-in')?.addEventListener('click', () => this.zoomTree(10));
-        document.getElementById('tree-zoom-out')?.addEventListener('click', () => this.zoomTree(-10));
-        document.getElementById('tree-reset')?.addEventListener('click', () => this.resetTreeZoom());
-        document.getElementById('tree-mode-vertical')?.addEventListener('click', () => this.setTreeMode('vertical'));
-        document.getElementById('tree-mode-horizontal')?.addEventListener('click', () => this.setTreeMode('horizontal'));
-        document.getElementById('close-tree-panel')?.addEventListener('click', () => this.closeTreePanel());
-
-        document.getElementById('baota-zoom-in')?.addEventListener('click', () => this.zoomBaota(10));
-        document.getElementById('baota-zoom-out')?.addEventListener('click', () => this.zoomBaota(-10));
-        document.getElementById('baota-reset')?.addEventListener('click', () => this.resetBaotaZoom());
-        document.getElementById('show-before-17')?.addEventListener('change', e => this.loadBaota(e.target.checked));
-        document.getElementById('close-baota-panel')?.addEventListener('click', () => this.closeBaotaPanel());
-
-        document.getElementById('btn-add-father')?.addEventListener('click', () => this.addRelative('father'));
-        document.getElementById('btn-add-son')?.addEventListener('click', () => this.addRelative('son'));
-        document.getElementById('btn-add-spouse')?.addEventListener('click', () => this.addRelative('spouse'));
-        document.getElementById('btn-add-sibling')?.addEventListener('click', () => this.addRelative('sibling'));
-        document.getElementById('btn-edit-person')?.addEventListener('click', () => this.editSelectedPerson());
-
-        document.getElementById('baota-btn-add-father')?.addEventListener('click', () => this.addRelative('father'));
-        document.getElementById('baota-btn-add-son')?.addEventListener('click', () => this.addRelative('son'));
-        document.getElementById('baota-btn-add-spouse')?.addEventListener('click', () => this.addRelative('spouse'));
-        document.getElementById('baota-btn-add-sibling')?.addEventListener('click', () => this.addRelative('sibling'));
-        document.getElementById('baota-btn-edit-person')?.addEventListener('click', () => this.editSelectedBaotaPerson());
-
-        document.getElementById('gen-prev')?.addEventListener('click', () => this.prevGeneration());
-        document.getElementById('gen-next')?.addEventListener('click', () => this.nextGeneration());
-        document.getElementById('gen-select')?.addEventListener('change', e => this.loadGeneration(e.target.value));
-
-        document.getElementById('import-btn')?.addEventListener('click', () => document.getElementById('import-file')?.click());
-        document.getElementById('import-file')?.addEventListener('change', e => e.target.files[0] && this.importData(e.target.files[0]));
-        document.getElementById('export-btn')?.addEventListener('click', () => this.exportData());
-        document.getElementById('backup-btn')?.addEventListener('click', () => this.backup());
-        document.getElementById('restore-btn')?.addEventListener('click', () => this.showRestoreConfirm());
+        document.querySelectorAll('.worship-sort-bar .sort-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.worship-sort-bar .sort-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.worshipSortMode = btn.dataset.sort;
+                this.filterWorshipAncestors();
+            });
+        });
+        $('worship-search')?.addEventListener('input', () => this.filterWorshipAncestors());
+        // 弹窗关闭
+        document.querySelectorAll('.modal-close').forEach(btn => btn.addEventListener('click', () => this.closeAllModals()));
+        $('confirm-cancel')?.addEventListener('click', () => this.closeModal('confirm-modal'));
     }
 
+    // ═══ 工具函数 ═══
+    isSpouse(p) { return !!(p.spouse_of_id && String(p.spouse_of_id) !== '0' && p.spouse_of_id !== ''); }
+    isAlive(p) { return p.is_alive !== 0 && !p.death_date; }
+
+    getRoleLabel(role) {
+        return { guest: '匿名游客', user: '未认证', member: '家族成员', admin: '管理员', super_admin: '超管员' }[role] || role;
+    }
+
+    renderGenderAvatar(person, className, size) {
+        return renderGenderAvatarHtml(person, className, size);
+    }
+
+    renderAnnouncementTemplate(content) {
+        if (!content) return '';
+        const u = this.currentUser || {};
+        const personId = u.personId || u.person_id;
+        const person = personId ? this.peopleDict[personId] : null;
+        return content
+            .replace(/\{\{username\}\}/g, u.nickname || u.username || '')
+            .replace(/\{\{li_shi_id\}\}/g, u.li_shi_id || '')
+            .replace(/\{\{person_name\}\}/g, person ? person.name : '')
+            .replace(/\{\{generation\}\}/g, person ? (person.generation || '') : '')
+            .replace(/\{\{shi_xi\}\}/g, person ? `第${person.shi_xi}世` : '');
+    }
+
+    showConfirm(title, message, onOk) {
+        document.getElementById('confirm-title').textContent = title;
+        document.getElementById('confirm-message').textContent = message;
+        document.getElementById('confirm-ok').onclick = () => { this.closeModal('confirm-modal'); onOk(); };
+        this.showModal('confirm-modal');
+    }
+
+    showModal(id) { this.closeAllModals(); document.getElementById(id)?.classList.remove('hidden'); }
+    closeModal(id) { document.getElementById(id)?.classList.add('hidden'); }
+    closeAllModals() { document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden')); }
+    closeDynamicModal() { this.closeModal('dynamic-modal'); }
+
+    toggleSidebar() { document.getElementById('sidebar')?.classList.toggle('open'); document.getElementById('overlay')?.classList.toggle('show'); }
+    closeSidebar() { document.getElementById('sidebar')?.classList.remove('open'); document.getElementById('overlay')?.classList.remove('show'); }
+
+    // ═══ 登录 ═══
     checkLogin() {
         const token = localStorage.getItem('token');
         const userInfo = localStorage.getItem('userInfo');
+        const urlParams = new URLSearchParams(window.location.search);
+        const bindToken = urlParams.get('bind_token');
+        if (bindToken) localStorage.setItem('bind_token', bindToken);
         if (token && userInfo) {
-            try {
-                this.currentUser = JSON.parse(userInfo);
-                api.setToken(token);
-                this.showMainPage();
-                this.updateUI();
-            } catch (e) {
-                this.showLoginPage();
-            }
+            try { this.currentUser = JSON.parse(userInfo); api.setToken(token); this.showMainPage(); this.updateUI(); this.loadHomeData(); }
+            catch (e) { this.showLoginPage(); }
+        } else { this.showLoginPage(); }
+    }
+
+    showLoginPage() { document.getElementById('login-page')?.classList.remove('hidden'); document.getElementById('main-page')?.classList.add('hidden'); }
+    showMainPage() { document.getElementById('login-page')?.classList.add('hidden'); document.getElementById('main-page')?.classList.remove('hidden'); }
+
+    /** 更新登录页布局（电脑端两栏都显示，手机端Tab切换） */
+    _updateLoginLayout() {
+        const isDesktop = window.innerWidth >= 768;
+        const wechatContent = document.getElementById('login-wechat');
+        const accountContent = document.getElementById('login-account');
+        if (isDesktop) {
+            // 电脑端：两个区域都显示
+            if (wechatContent) wechatContent.classList.add('active');
+            if (accountContent) accountContent.classList.add('active');
         } else {
-            this.showLoginPage();
+            // 手机端：按Tab切换
+            const activeTab = document.querySelector('.login-tab.active');
+            if (activeTab) {
+                const tabName = activeTab.dataset.tab;
+                if (wechatContent) wechatContent.classList.toggle('active', tabName === 'wechat');
+                if (accountContent) accountContent.classList.toggle('active', tabName === 'account');
+            }
         }
-    }
-
-    showLoginPage() {
-        document.getElementById('login-page')?.classList.remove('hidden');
-        document.getElementById('main-page')?.classList.add('hidden');
-    }
-
-    showMainPage() {
-        document.getElementById('login-page')?.classList.add('hidden');
-        document.getElementById('main-page')?.classList.remove('hidden');
-    }
-
-    updateUI() {
-        const isAdmin = this.currentUser?.role === 'admin' || this.currentUser?.role === 'super';
-        document.getElementById('username-display').textContent = this.currentUser?.username || '';
-        document.querySelectorAll('.admin-only').forEach(el => {
-            el.classList.toggle('hidden', !isAdmin);
-            el.classList.toggle('show', isAdmin);
-        });
     }
 
     async login() {
         const username = document.getElementById('login-username').value.trim();
         const password = document.getElementById('login-password').value;
-        if (!username || !password) {
-            showToast('请输入用户名和密码', 'error');
-            return;
-        }
+        if (!username || !password) { showToast('请输入用户名和密码', 'error'); return; }
         showLoading();
         try {
             const res = await api.login(username, password);
             if (res.status === 'success') {
-                this.currentUser = res.user;
+                this.currentUser = { username: res.username || username, role: res.role || 'user', verified: res.verified || 0, personId: res.personId || '', li_shi_id: res.li_shi_id || '', loginType: 'admin_password' };
                 api.setToken(res.token);
-                localStorage.setItem(USER_KEY, JSON.stringify(res.user));
-                this.showMainPage();
-                this.updateUI();
+                localStorage.setItem(USER_KEY, JSON.stringify(this.currentUser));
+                clearApiCache();
+                try {
+                    const meRes = await api.getMe();
+                    if (meRes.status === 'success' && meRes.data) {
+                        const me = meRes.data;
+                        this.currentUser = { ...this.currentUser, nickname: me.nickname || '', avatar_url: me.avatar_url || '', phone: me.phone || username, personId: me.person_summary?.id || this.currentUser.personId, role: me.role || this.currentUser.role, verified: me.verified || 0, li_shi_id: me.li_shi_id || this.currentUser.li_shi_id, person_summary: me.person_summary };
+                        localStorage.setItem(USER_KEY, JSON.stringify(this.currentUser));
+                    }
+                } catch (e) {}
+                this.showMainPage(); this.updateUI(); this.loadHomeData();
                 showToast('登录成功', 'success');
-            } else {
-                showToast(res.message || '登录失败', 'error');
-            }
-        } catch (e) {
-            showToast('登录失败: ' + e.message, 'error');
-        } finally {
-            hideLoading();
-        }
+                // 检查是否有待绑定的bind_token
+                this.checkBindToken();
+            } else { showToast(res.message || '登录失败', 'error'); }
+        } catch (e) { showToast('登录失败: ' + e.message, 'error'); }
+        finally { hideLoading(); }
     }
 
-    async guestLogin() {
-        this.currentUser = { username: '游客', role: 'guest' };
+    guestLogin() {
+        const guestId = getOrCreateGuestId();
+        this.currentUser = { username: '游客', role: 'guest', loginType: 'guest', guest_id: guestId };
         localStorage.setItem(USER_KEY, JSON.stringify(this.currentUser));
-        this.showMainPage();
-        this.updateUI();
+        clearApiCache();
+        this.showMainPage(); this.updateUI(); this.loadHomeData();
         showToast('以游客身份浏览', 'info');
     }
 
+    async initWechatLogin() { await wechatLogin.init('wechat-qr-container'); }
+
     logout() {
-        api.clearToken();
-        this.currentUser = null;
-        this.peopleData = [];
-        this.peopleDict = {};
-        this.showLoginPage();
+        this.showConfirm('退出登录', '确定退出当前账号吗？', () => {
+            api.clearToken(); this.currentUser = null; this.peopleData = []; this.peopleDict = {}; clearApiCache();
+            this.stopAllAnnTimers(); this.showLoginPage();
+        });
     }
 
-    toggleSidebar() {
-        document.getElementById('sidebar')?.classList.toggle('open');
-        document.getElementById('overlay')?.classList.toggle('show');
+    onHeaderUserClick() { this.navigateTo('me'); }
+
+    /** 检查并处理bind_token分享绑定 */
+    async checkBindToken() {
+        const bindToken = localStorage.getItem('bind_token');
+        if (!bindToken || isGuest()) return;
+        try {
+            // bind_token 绑定逻辑：如果当前用户未绑定人物，自动绑定
+            if (!this.currentUser?.personId) {
+                const res = await api.bindWechatPerson(null); // 先确认当前绑定状态
+                // bind_token通常由后端在首次登录时自动处理
+                // 这里仅清除本地存储
+            }
+            localStorage.removeItem('bind_token');
+        } catch (e) {
+            localStorage.removeItem('bind_token');
+        }
     }
 
-    closeSidebar() {
-        document.getElementById('sidebar')?.classList.remove('open');
-        document.getElementById('overlay')?.classList.remove('show');
+    // ═══ UI更新 ═══
+    updateUI() {
+        if (!this.currentUser) return;
+        const role = this.currentUser.role || 'guest';
+        const isAdminRole = role === 'admin' || role === 'super_admin';
+        const isSuperAdminRole = role === 'super_admin';
+        const isGuestUser = role === 'guest';
+
+        const displayName = this.getDisplayName();
+        document.getElementById('username-display').textContent = displayName;
+        const roleTag = document.getElementById('role-display');
+        if (roleTag) { roleTag.textContent = this.getRoleLabel(role); roleTag.className = `role-tag-small role-tag-${role}`; }
+        const liShiDisplay = document.getElementById('li-shi-display');
+        if (liShiDisplay) liShiDisplay.textContent = this.currentUser.li_shi_id ? `李氏号: ${this.currentUser.li_shi_id}` : '';
+        const peopleMenuText = document.getElementById('people-menu-text');
+        if (peopleMenuText) peopleMenuText.textContent = isAdminRole ? '人员管理' : '人员列表';
+
+        document.querySelectorAll('.admin-only').forEach(el => { el.classList.toggle('hidden', !isAdminRole); el.classList.toggle('show', isAdminRole); });
+        document.querySelectorAll('.super-admin-only').forEach(el => { el.classList.toggle('hidden', !isSuperAdminRole); });
+        document.querySelectorAll('.worship-menu-item,.worship-menu-home').forEach(el => { el.classList.toggle('hidden', isGuestUser); });
+
+        const messagesTitle = document.getElementById('messages-title');
+        if (messagesTitle) messagesTitle.textContent = isAdminRole ? '管理留言' : '给管理者留言';
+        const addBtn = document.getElementById('add-person-btn');
+        if (addBtn) addBtn.classList.toggle('hidden', !isAdminRole);
     }
 
-    navigateTo(page) {
+    getDisplayName() {
+        if (!this.currentUser) return '';
+        if (this.currentUser.role === 'guest') return '游客';
+        const personId = this.currentUser.personId || this.currentUser.person_id;
+        if (personId && this.peopleDict[personId]) return `${this.peopleDict[personId].name}兄弟`;
+        return this.currentUser.nickname || this.currentUser.username || '';
+    }
+
+    // ═══ 导航 ═══
+    navigateTo(page, params = {}) {
         this.closeSidebar();
-        document.querySelectorAll('.menu-item').forEach(item => {
-            item.classList.toggle('active', item.dataset.page === page);
-        });
-        document.querySelectorAll('.content-section').forEach(section => {
-            section.classList.add('hidden');
-        });
+        document.querySelectorAll('.menu-item').forEach(item => item.classList.toggle('active', item.dataset.page === page));
+        document.querySelectorAll('.tab-item').forEach(tab => tab.classList.toggle('active', tab.dataset.page === page));
+        document.querySelectorAll('.content-section').forEach(section => section.classList.add('hidden'));
         const targetSection = document.getElementById(`${page}-section`);
         if (targetSection) targetSection.classList.remove('hidden');
+        this._navParams = params;
 
-        switch (page) {
-            case 'overview': this.loadOverview(); break;
-            case 'people': this.loadPeople(); break;
-            case 'tree': this.loadTree(); break;
-            case 'baota': this.loadBaota(true); break;
-            case 'generation': this.loadGenerationView(); break;
-            case 'stats': this.loadStats(); break;
-            case 'users': this.loadUsers(); break;
-            case 'import': break;
-            case 'backup': this.loadBackups(); break;
-            case 'photos': this.loadPhotos(); break;
-        }
+        // 根据页面加载对应数据
+        const loaders = {
+            home: () => this.loadHomeData(), people: () => this.loadPeople(), tree: () => this.loadTree(),
+            baota: () => this.loadBaota(true), 'generation-names': () => this.loadGenerationNames(),
+            'gen-stats': () => this.loadGenStats(), messages: () => this.loadMessages(),
+            'announcement-manage': () => this.loadAnnouncementManage(), 'announcement-board': () => this.loadAnnouncementBoard(),
+            'admin-accounts': () => this.loadAdminAccounts(), worship: () => this.loadWorship(),
+            'worship-admin': () => this.loadWorshipAdmin(), 'worship-live-rank': () => this.loadWorshipLiveRank(),
+            'worship-merit-rank': () => this.loadWorshipMeritRank(), me: () => this.loadMe(),
+            'person-detail': () => { if (params.id) this.loadPersonDetail(params.id); },
+            'person-edit': () => this.loadPersonEdit(params)
+        };
+        if (loaders[page]) loaders[page]();
+        window.scrollTo(0, 0);
     }
 
-    closeAllModals() {
-        document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
-    }
-
-    closeModal(id) {
-        document.getElementById(id)?.classList.add('hidden');
-    }
-
-    showModal(id) {
-        this.closeAllModals();
-        document.getElementById(id)?.classList.remove('hidden');
-    }
-
-    switchTab(btn) {
-        const tabName = btn.dataset.tab;
-        btn.parentElement.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        btn.closest('.modal').querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        document.getElementById(`tab-${tabName}`)?.classList.add('active');
-    }
-
-    async loadOverview() {
+    // ═══ 首页 ═══
+    async loadHomeData() {
         showLoading();
         try {
-            const res = await api.getPeople();
-            if (res.status === 'success') {
-                this.peopleData = res.data || [];
-                this.buildPeopleDict();
-                this.updateOverviewStats();
-                this.renderRecentPeople();
-            }
-        } catch (e) {
-            showToast('加载失败', 'error');
-        } finally {
-            hideLoading();
-        }
+            const peopleRes = await api.getPeople();
+            if (peopleRes.status === 'success') { this.peopleData = peopleRes.data || []; this.buildPeopleDict(); this.updateHomeStats(); this.renderRecentPeople(); }
+            this.loadAnnouncementsForPage('index', 'announcement-bar', 'ann-scroll-area', 'ann-text', 'ann-dots');
+            this.loadUnreadMsgCount();
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
     }
 
-    buildPeopleDict() {
-        this.peopleDict = {};
-        this.peopleData.forEach(p => {
-            this.peopleDict[p.id] = p;
-        });
-    }
+    buildPeopleDict() { this.peopleDict = {}; this.peopleData.forEach(p => { this.peopleDict[p.id] = p; }); }
 
-    updateOverviewStats() {
-        const total = this.peopleData.length;
-        const male = this.peopleData.filter(p => p.gender === '男').length;
-        const female = this.peopleData.filter(p => p.gender === '女').length;
-        const gens = [...new Set(this.peopleData.map(p => p.shi_xi).filter(s => s))].sort((a, b) => a - b);
-        
-        document.getElementById('stat-total').textContent = total;
-        document.getElementById('stat-male').textContent = male;
-        document.getElementById('stat-female').textContent = female;
-        document.getElementById('stat-gen').textContent = gens.length || 0;
+    updateHomeStats() {
+        const people = this.peopleData;
+        const nonSp = people.filter(p => !this.isSpouse(p));
+        const maleCount = nonSp.filter(p => p.gender === '男').length;
+        const femaleCount = nonSp.filter(p => p.gender === '女').length;
+        const shiXis = nonSp.map(p => parseInt(p.shi_xi)).filter(x => !isNaN(x));
+        const genSet = new Set(shiXis);
+        const totalPeople = people.length;
 
-        const after17 = this.peopleData.filter(p => p.shi_xi > 17);
-        const after17Male = after17.filter(p => p.gender === '男').length;
-        const after17Alive = after17.filter(p => p.is_alive == 1 || p.is_alive === true).length;
-        const after17Unmarried = after17.filter(p => p.is_married == 0 || p.is_married === false).length;
-        const aliveGens = [...new Set(after17.filter(p => p.is_alive == 1 || p.is_alive === true).map(p => p.shi_xi).filter(s => s))];
+        document.getElementById('stat-total').textContent = totalPeople;
+        document.getElementById('stat-male').textContent = maleCount;
+        document.getElementById('stat-female').textContent = femaleCount;
+        document.getElementById('stat-gen').textContent = shiXis.length > 0 ? (Math.max(...shiXis) - Math.min(...shiXis) + 1) : 0;
+        document.getElementById('gen-entry-count').textContent = `共${genSet.size}个世代 · ${totalPeople}人`;
 
-        document.getElementById('after17-male').textContent = after17Male;
-        document.getElementById('after17-alive').textContent = after17Alive;
-        document.getElementById('after17-unmarried').textContent = after17Unmarried;
-        document.getElementById('after17-gens').textContent = aliveGens.length;
+        // 17世后统计
+        const pMap = {}; people.forEach(p => { pMap[String(p.id)] = p; });
+        const after17 = people.filter(p => parseInt(p.shi_xi) >= 17 && !this.isSpouse(p));
+        const totalMale = after17.filter(p => p.gender === '男').length;
+        const aliveMale = after17.filter(p => p.gender === '男' && this.isAlive(p)).length;
+        const unmarriedMale = after17.filter(p => p.gender === '男' && this.isAlive(p) && (p.is_married === 0 || !p.is_married)).length;
+        const aliveGensSet = new Set(after17.filter(p => this.isAlive(p)).map(p => parseInt(p.shi_xi) || 0).filter(x => x >= 17));
+        const sortedAliveGens = Array.from(aliveGensSet).sort((a, b) => a - b);
+        const aliveGenCount = sortedAliveGens.length > 0 ? (sortedAliveGens[sortedAliveGens.length - 1] - sortedAliveGens[0] + 1) : 0;
+
+        const isAfter17 = (p) => { if (this.isSpouse(p)) { const h = pMap[String(p.spouse_of_id)]; return h && (parseInt(h.shi_xi) || 0) >= 17; } return (parseInt(p.shi_xi) || 0) >= 17; };
+        const aliveTotal = people.filter(p => isAfter17(p) && this.isAlive(p)).length;
+        const aliveSpouse = people.filter(p => this.isSpouse(p) && isAfter17(p) && this.isAlive(p)).length;
+
+        document.getElementById('after17-male').textContent = totalMale;
+        document.getElementById('after17-alive').textContent = aliveMale;
+        document.getElementById('after17-unmarried').textContent = unmarriedMale;
+        document.getElementById('after17-gens').textContent = aliveGenCount;
+        document.getElementById('after17-alive-total').textContent = aliveTotal;
+        document.getElementById('after17-alive-spouse').textContent = aliveSpouse;
     }
 
     renderRecentPeople() {
         const container = document.getElementById('recent-people-list');
         if (!container) return;
-        const recent = this.peopleData.slice(-8).reverse();
-        if (recent.length === 0) {
-            container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">暂无数据</p>';
-            return;
-        }
+        const after17 = this.peopleData.filter(p => parseInt(p.shi_xi) >= 17 && !this.isSpouse(p));
+        const recent = after17.slice(-5).reverse();
+        if (recent.length === 0) { container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;">暂无17世后数据</p>'; return; }
         container.innerHTML = recent.map(p => `
-            <div class="recent-item" onclick="app.showPersonDetail(${p.id})">
-                <div class="recent-avatar ${p.gender === '女' ? 'female' : ''}">${getAvatarText(p)}</div>
+            <div class="recent-item" onclick="app.navigateTo('person-detail',{id:${p.id}})">
+                ${this.renderGenderAvatar(p, 'recent-avatar')}
                 <div class="recent-info">
                     <div class="recent-name">${getDisplayName(p)}</div>
-                    <div class="recent-meta">${getGenerationText(p.shi_xi)}${p.ranking ? ' · ' + p.ranking : ''}</div>
+                    <div class="recent-meta">${p.generation ? `字辈:${p.generation} ` : ''}第${p.shi_xi}世${p.ranking ? ' · ' + p.ranking : ''}</div>
                 </div>
+                <span class="alive-dot ${this.isAlive(p) ? 'alive' : 'dead'}"></span>
             </div>
         `).join('');
     }
 
+    async loadUnreadMsgCount() {
+        if (!isAdmin()) return;
+        try {
+            const res = await api.getUnreadMessageCount();
+            if (res.status === 'success') {
+                const count = res.count || 0; this.homeUnreadCount = count;
+                const badge = document.getElementById('home-unread-badge');
+                if (badge) { badge.style.display = count > 0 ? 'inline' : 'none'; badge.textContent = count > 99 ? '99+' : count; }
+                const sidebarBadge = document.getElementById('sidebar-unread-badge');
+                if (sidebarBadge) { sidebarBadge.classList.toggle('hidden', count === 0); sidebarBadge.textContent = count > 99 ? '99+' : count; }
+                const tabBadge = document.getElementById('tab-unread-badge');
+                if (tabBadge) { tabBadge.classList.toggle('hidden', count === 0); tabBadge.textContent = count > 99 ? '99+' : count; }
+            }
+        } catch (e) {}
+    }
+
+    // ═══ 公告系统 ═══
+    async loadAnnouncementsForPage(pageKey, barId, scrollAreaId, textId, dotsId) {
+        try {
+            const res = await api.getAnnouncements(pageKey);
+            if (res.status === 'success') {
+                const anns = (res.data || []).filter(a => {
+                    if (a.is_active != 1) return false;
+                    const pagesStr = a.pages || '';
+                    if (!pagesStr) return true;
+                    return pagesStr.split(',').map(s => s.trim()).filter(s => s).includes(pageKey);
+                }).map(a => {
+                    const content = a.content || '';
+                    const se = a.scroll_enabled !== undefined ? a.scroll_enabled : 1;
+                    return { ...a, needScroll: se === 1 && content.length > 20, scrollDuration: (a.scroll_duration && a.scroll_duration > 0) ? a.scroll_duration : 8, scrollEnabled: se, renderedContent: this.renderAnnouncementTemplate(content) };
+                });
+                const key = pageKey;
+                this.annCurrentIndex[key] = 0;
+                this[`anns_${key}`] = anns;
+                const bar = document.getElementById(barId);
+                if (!bar) return;
+                if (anns.length === 0) { bar.classList.add('hidden'); return; }
+                bar.classList.remove('hidden');
+                this.renderAnnouncementContent(key, barId, scrollAreaId, textId, dotsId);
+                this.startAnnTimer(key, barId, scrollAreaId, textId, dotsId);
+            }
+        } catch (e) { console.error('公告加载失败:', e); }
+    }
+
+    renderAnnouncementContent(key, barId, scrollAreaId, textId, dotsId) {
+        const anns = this[`anns_${key}`] || [];
+        const idx = this.annCurrentIndex[key] || 0;
+        const ann = anns[idx];
+        if (!ann) return;
+        const textEl = document.getElementById(textId);
+        if (textEl) {
+            const content = ann.renderedContent || ann.content;
+            if (ann.needScroll) {
+                textEl.className = 'ann-text ann-scrolling';
+                textEl.style.animationDuration = ann.scrollDuration + 's';
+            } else {
+                textEl.className = 'ann-text';
+                textEl.style.animationDuration = '';
+            }
+            textEl.textContent = content;
+        }
+        const dotsEl = document.getElementById(dotsId);
+        if (dotsEl && anns.length > 1) {
+            dotsEl.innerHTML = anns.map((a, i) => `<div class="ann-dot ${i === idx ? 'active' : ''}"></div>`).join('');
+        }
+    }
+
+    startAnnTimer(key, barId, scrollAreaId, textId, dotsId) {
+        this.stopAnnTimer(key);
+        const anns = this[`anns_${key}`] || [];
+        if (anns.length <= 1) return;
+        const scheduleNext = () => {
+            const idx = this.annCurrentIndex[key] || 0;
+            const current = anns[idx];
+            const delay = current ? (current.scrollDuration || 8) * 1000 : 8000;
+            this.annTimers[key] = setTimeout(() => {
+                this.annCurrentIndex[key] = ((this.annCurrentIndex[key] || 0) + 1) % anns.length;
+                this.renderAnnouncementContent(key, barId, scrollAreaId, textId, dotsId);
+                this.startAnnTimer(key, barId, scrollAreaId, textId, dotsId);
+            }, delay);
+        };
+        scheduleNext();
+    }
+
+    stopAnnTimer(key) { if (this.annTimers[key]) { clearTimeout(this.annTimers[key]); delete this.annTimers[key]; } }
+    stopAllAnnTimers() { Object.keys(this.annTimers).forEach(k => this.stopAnnTimer(k)); }
+
+    // ═══ 人员列表 ═══
     async loadPeople() {
         showLoading();
         try {
             const res = await api.getPeople();
             if (res.status === 'success') {
-                this.peopleData = res.data || [];
-                this.buildPeopleDict();
-                this.filterPeople();
+                this.peopleData = res.data || []; this.buildPeopleDict();
+                const params = this._navParams || {};
+                this.peopleFilters = { hideDead: false, hideFemale: false, onlyAfter17: false, filterShiXi: params.filterShiXi ? String(params.filterShiXi) : '', filterAlive: !!params.filterAlive, filterMale: !!params.filterMale, filterSpouse: !!params.filterSpouse, filterFemale: !!params.filterFemale };
+                this.updateFilterButtons(); this.filterPeople();
             }
-        } catch (e) {
-            showToast('加载失败', 'error');
-        } finally {
-            hideLoading();
-        }
+            this.loadAnnouncementsForPage('people', 'people-announcement-bar', 'people-ann-scroll-area', 'people-ann-text');
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    togglePeopleFilter(name) { this.peopleFilters[name] = !this.peopleFilters[name]; this.updateFilterButtons(); this.filterPeople(); }
+
+    updateFilterButtons() {
+        const f = this.peopleFilters;
+        const set = (id, active, aText, iText) => { const b = document.getElementById(id); if (b) { b.classList.toggle('active', active); b.textContent = active ? aText : iText; } };
+        set('filter-dead-toggle', f.hideDead, '健故通显', '隐藏已故');
+        set('filter-female-toggle', f.hideFemale, '男女通显', '隐藏女性');
+        set('filter-before17-toggle', f.onlyAfter17, '全部世代', '只显17世后');
     }
 
     filterPeople() {
         const search = document.getElementById('people-search')?.value.toLowerCase() || '';
-        const filter = document.getElementById('people-filter')?.value || '';
-        
-        let filtered = this.peopleData.filter(p => {
-            const matchSearch = !search || 
-                p.name?.toLowerCase().includes(search) ||
-                p.phone?.includes(search);
-            const matchFilter = !filter || (
-                filter === 'alive' && (p.is_alive == 1 || p.is_alive === true)) ||
-                filter === 'deceased' && (p.is_alive == 0 || p.is_alive === false) ||
-                filter === 'married' && (p.is_married == 1 || p.is_married === true) ||
-                filter === 'unmarried' && (p.is_married == 0 || p.is_married === false);
-            return matchSearch && matchFilter;
+        const f = this.peopleFilters;
+        const filtered = this.peopleData.filter(p => {
+            if (search && !((p.name && p.name.toLowerCase().includes(search)) || (p.alias && p.alias.toLowerCase().includes(search)) || (p.generation && p.generation.toLowerCase().includes(search)))) return false;
+            if (f.hideDead && !this.isAlive(p)) return false;
+            if (f.hideFemale && p.gender === '女' && !this.isSpouse(p)) return false;
+            if (f.onlyAfter17 && parseInt(p.shi_xi) < 17 && !this.isSpouse(p)) return false;
+            if (f.filterShiXi && String(p.shi_xi) !== f.filterShiXi) return false;
+            if (f.filterAlive && !this.isAlive(p)) return false;
+            if (f.filterMale && p.gender !== '男') return false;
+            if (f.filterSpouse && !this.isSpouse(p)) return false;
+            if (f.filterFemale && (p.gender !== '女' || this.isSpouse(p))) return false;
+            return true;
         });
         this.renderPeopleList(filtered);
     }
@@ -333,1024 +540,530 @@ class ZupuApp {
     renderPeopleList(people) {
         const container = document.getElementById('people-list');
         if (!container) return;
-        if (people.length === 0) {
-            container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 40px;">暂无数据</p>';
-            return;
-        }
-        container.innerHTML = people.map(p => this.renderPersonCard(p)).join('');
-    }
-
-    renderPersonCard(p) {
-        const isAlive = p.is_alive == 1 || p.is_alive === true;
-        const isMarried = p.is_married == 1 || p.is_married === true;
-        return `
-            <div class="person-card" onclick="app.showPersonDetail(${p.id})">
+        if (people.length === 0) { container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px;">暂无数据</p>'; return; }
+        container.innerHTML = people.map(p => {
+            const spouse = this.isSpouse(p);
+            const father = p.father_id ? this.peopleDict[p.father_id] : null;
+            const fatherName = father ? father.name : (p.father_name || '');
+            return `
+            <div class="person-card" onclick="app.navigateTo('person-detail',{id:${p.id}})">
                 <div class="card-header">
-                    <div class="person-avatar ${p.gender === '女' ? 'female' : ''}">${getAvatarText(p)}</div>
+                    ${this.renderGenderAvatar(p, 'person-avatar')}
                     <div class="person-main">
-                        <div class="person-name">${getDisplayName(p)}</div>
-                        <div class="person-meta">${getGenerationText(p.shi_xi)}${p.ranking ? ' · ' + p.ranking : ''}</div>
+                        <div class="person-name">${getDisplayName(p)}${p.alias ? `(${p.alias})` : ''}</div>
+                        <div class="person-meta">
+                            ${spouse ? '<span class="spouse-tag">配偶</span>' : ''}
+                            ${p.generation && !spouse ? `<span class="gen-tag">${p.generation}</span>` : ''}
+                            ${p.shi_xi && !spouse ? `第${p.shi_xi}世` : ''}
+                            ${fatherName ? ` · ${fatherName}之子` : ''}
+                        </div>
                     </div>
+                    <span class="alive-dot ${this.isAlive(p) ? 'alive' : 'dead'}"></span>
                 </div>
-                <div class="person-badges">
-                    <span class="badge ${isAlive ? 'badge-alive' : 'badge-deceased'}">${isAlive ? '健在' : '去世'}</span>
-                    <span class="badge ${isMarried ? 'badge-married' : 'badge-unmarried'}">${isMarried ? '已婚' : '未婚'}</span>
-                    ${p.generation ? `<span class="badge" style="background: #e0e7ff; color: #4338ca;">${p.generation}</span>` : ''}
-                </div>
-                <div class="person-footer">
-                    <span><i class="fas fa-phone"></i> ${p.phone || '-'}</span>
-                    <span><i class="fas fa-map-marker-alt"></i> ${p.live_place || '-'}</span>
-                </div>
-            </div>
-        `;
+            </div>`;
+        }).join('');
     }
 
-    showPersonDetail(id) {
-        const person = this.peopleDict[id];
-        if (!person) return;
-        this.selectedPerson = person;
-        document.getElementById('detail-modal-title').textContent = person.name;
-        document.getElementById('detail-content').innerHTML = this.renderPersonDetail(person);
-        this.showModal('detail-modal');
+    // ═══ 人员详情 ═══
+    async loadPersonDetail(id) {
+        showLoading();
+        try {
+            const res = await api.getPerson(id);
+            if (res.status === 'success') this.renderPersonDetail(res.data);
+            else showToast(res.message || '加载失败', 'error');
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
     }
 
     renderPersonDetail(p) {
-        const father = p.father_id ? this.peopleDict[p.father_id] : null;
-        const spouse = p.spouse_name ? p.spouse_name : (p.spouse_of_id ? this.peopleDict[p.spouse_of_id]?.name : '');
-        const children = this.peopleData.filter(child => child.father_id == p.id);
-        const isAlive = p.is_alive == 1 || p.is_alive === true;
-        return `
-            <div class="detail-header">
-                <div class="detail-avatar ${p.gender === '女' ? 'female' : ''}">${getAvatarText(p)}</div>
-                <h2>${getDisplayName(p)}</h2>
-                <p>${getGenerationText(p.shi_xi)}${p.ranking ? ' · ' + p.ranking : ''}</p>
-                <div class="detail-badges">
-                    <span class="badge ${p.gender === '男' ? 'badge-alive' : 'badge-deceased'}" style="background: ${p.gender === '男' ? '#dbeafe' : '#fce7f3'}; color: ${p.gender === '男' ? '#1e40af' : '#be185d'};">${p.gender}</span>
-                    <span class="badge ${isAlive ? 'badge-alive' : 'badge-deceased'}">${isAlive ? '健在' : '去世'}</span>
-                    <span class="badge ${p.is_married == 1 || p.is_married === true ? 'badge-married' : 'badge-unmarried'}">${p.is_married == 1 || p.is_married === true ? '已婚' : '未婚'}</span>
-                </div>
-            </div>
-            <div class="detail-section">
-                <h4><i class="fas fa-info-circle"></i> 基本信息</h4>
-                <div class="detail-grid">
-                    <div class="detail-item"><div class="detail-item-label">字辈</div><div class="detail-item-value">${p.generation || '-'}</div></div>
-                    <div class="detail-item"><div class="detail-item-label">世系</div><div class="detail-item-value">${getGenerationText(p.shi_xi) || '-'}</div></div>
-                    <div class="detail-item"><div class="detail-item-label">排行</div><div class="detail-item-value">${p.ranking || '-'}</div></div>
-                    <div class="detail-item"><div class="detail-item-label">手机</div><div class="detail-item-value">${p.phone || '-'}</div></div>
-                    <div class="detail-item"><div class="detail-item-label">出生日期</div><div class="detail-item-value">${formatDate(p.birth_date) || '-'}</div></div>
-                    <div class="detail-item"><div class="detail-item-label">去世日期</div><div class="detail-item-value">${formatDate(p.death_date) || '-'}</div></div>
-                </div>
-            </div>
-            <div class="detail-section">
-                <h4><i class="fas fa-map-marker-alt"></i> 地点信息</h4>
-                <div class="detail-grid">
-                    <div class="detail-item"><div class="detail-item-label">籍贯</div><div class="detail-item-value">${p.birth_place || '-'}</div></div>
-                    <div class="detail-item"><div class="detail-item-label">现居地</div><div class="detail-item-value">${p.live_place || '-'}</div></div>
-                </div>
-            </div>
-            <div class="detail-section">
-                <h4><i class="fas fa-users"></i> 家庭关系</h4>
-                <div class="detail-grid">
-                    <div class="detail-item"><div class="detail-item-label">父亲</div><div class="detail-item-value">${father ? `<a href="javascript:app.showPersonDetail(${father.id})">${father.name}</a>` : '-'}</div></div>
-                    <div class="detail-item"><div class="detail-item-label">配偶</div><div class="detail-item-value">${spouse || '-'}</div></div>
-                    <div class="detail-item"><div class="detail-item-label">子女</div><div class="detail-item-value">${children.length}人</div></div>
-                </div>
-                ${children.length > 0 ? `<div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px;">${children.map(c => `<span class="badge badge-alive" style="cursor: pointer;" onclick="event.stopPropagation(); app.showPersonDetail(${c.id})">${c.name}</span>`).join('')}</div>` : ''}
-            </div>
-            ${p.bio ? `<div class="detail-section"><h4><i class="fas fa-file-alt"></i> 个人简介</h4><p style="font-size: 14px; color: var(--text-secondary);">${p.bio}</p></div>` : ''}
-        `;
-    }
-
-    editPersonFromDetail() {
-        if (this.selectedPerson) {
-            this.closeModal('detail-modal');
-            this.openEditPersonModal(this.selectedPerson);
-        }
-    }
-
-    openAddPersonModal(relation = null, targetId = null) {
-        document.getElementById('person-modal-title').textContent = '添加人员';
-        document.getElementById('person-id').value = '';
-        document.getElementById('person-relation').value = relation || '';
-        document.getElementById('person-target-id').value = targetId || '';
-        this.resetPersonForm();
-        this.populateFatherSpouseSelects();
-        this.showModal('person-modal');
-    }
-
-    openEditPersonModal(person) {
-        document.getElementById('person-modal-title').textContent = '编辑人员';
-        document.getElementById('person-id').value = person.id;
-        document.getElementById('person-relation').value = '';
-        document.getElementById('person-target-id').value = '';
-        this.resetPersonForm();
-        this.populateFatherSpouseSelects();
-        this.fillPersonForm(person);
-        this.showModal('person-modal');
-    }
-
-    resetPersonForm() {
-        document.getElementById('person-name').value = '';
-        document.getElementById('person-gender').value = '男';
-        document.getElementById('person-phone').value = '';
-        document.getElementById('person-generation').value = '';
-        document.getElementById('person-shi-xi').value = '';
-        document.getElementById('person-ranking').value = '';
-        document.getElementById('person-birth-date').value = '';
-        document.getElementById('person-death-date').value = '';
-        document.getElementById('person-alive').checked = true;
-        document.getElementById('person-married').checked = false;
-        document.getElementById('person-birth-place').value = '';
-        document.getElementById('person-live-place').value = '';
-        document.getElementById('person-bio').value = '';
-        document.getElementById('person-spouse-name').value = '';
-        document.getElementById('person-spouse-phone').value = '';
-        document.getElementById('person-spouse-birth-date').value = '';
-        document.getElementById('person-spouse-birth-place').value = '';
-        document.getElementById('person-spouse-live-place').value = '';
-    }
-
-    populateFatherSpouseSelects() {
-        const fatherSelect = document.getElementById('person-father');
-        const spouseSelect = document.getElementById('person-spouse');
-        fatherSelect.innerHTML = '<option value="">-- 选择父亲 --</option>';
-        spouseSelect.innerHTML = '<option value="">-- 选择配偶 --</option>';
-        this.peopleData.forEach(p => {
-            if (p.name) {
-                fatherSelect.innerHTML += `<option value="${p.id}">${p.name} (${getGenerationText(p.shi_xi)})</option>`;
-                if (p.gender === '女') {
-                    spouseSelect.innerHTML += `<option value="${p.id}">${p.name}</option>`;
-                }
-            }
-        });
-    }
-
-    fillPersonForm(p) {
-        document.getElementById('person-name').value = p.name || '';
-        document.getElementById('person-gender').value = p.gender || '男';
-        document.getElementById('person-phone').value = p.phone || '';
-        document.getElementById('person-generation').value = p.generation || '';
-        document.getElementById('person-shi-xi').value = p.shi_xi || '';
-        document.getElementById('person-ranking').value = p.ranking || '';
-        document.getElementById('person-birth-date').value = p.birth_date || '';
-        document.getElementById('person-death-date').value = p.death_date || '';
-        document.getElementById('person-alive').checked = p.is_alive != 0 && p.is_alive !== false;
-        document.getElementById('person-married').checked = p.is_married == 1 || p.is_married === true;
-        document.getElementById('person-birth-place').value = p.birth_place || '';
-        document.getElementById('person-live-place').value = p.live_place || '';
-        document.getElementById('person-bio').value = p.bio || '';
-        document.getElementById('person-spouse-name').value = p.spouse_name || '';
-        document.getElementById('person-spouse-phone').value = p.spouse_phone || '';
-        document.getElementById('person-spouse-birth-date').value = p.spouse_birth_date || '';
-        document.getElementById('person-spouse-birth-place').value = p.spouse_birth_place || '';
-        document.getElementById('person-spouse-live-place').value = p.spouse_live_place || '';
-        if (p.father_id) {
-            const fatherSelect = document.getElementById('person-father');
-            for (let i = 0; i < fatherSelect.options.length; i++) {
-                if (fatherSelect.options[i].value == p.father_id) {
-                    fatherSelect.selectedIndex = i;
-                    break;
-                }
-            }
-        }
-    }
-
-    async savePerson() {
-        const id = document.getElementById('person-id').value;
-        const relation = document.getElementById('person-relation').value;
-        const targetId = document.getElementById('person-target-id').value;
-        const name = document.getElementById('person-name').value.trim();
-        if (!name) {
-            showToast('请输入姓名', 'error');
-            return;
-        }
-        const data = {
-            name,
-            gender: document.getElementById('person-gender').value,
-            phone: document.getElementById('person-phone').value.trim(),
-            generation: document.getElementById('person-generation').value.trim(),
-            shi_xi: document.getElementById('person-shi-xi').value || '',
-            ranking: document.getElementById('person-ranking').value,
-            father_id: document.getElementById('person-father').value || '',
-            spouse_name: document.getElementById('person-spouse-name').value.trim(),
-            spouse_phone: document.getElementById('person-spouse-phone').value.trim(),
-            spouse_birth_date: document.getElementById('person-spouse-birth-date').value,
-            spouse_birth_place: document.getElementById('person-spouse-birth-place').value.trim(),
-            spouse_live_place: document.getElementById('person-spouse-live-place').value.trim(),
-            birth_date: document.getElementById('person-birth-date').value,
-            death_date: document.getElementById('person-death-date').value,
-            is_alive: document.getElementById('person-alive').checked ? 1 : 0,
-            is_married: document.getElementById('person-married').checked ? 1 : 0,
-            birth_place: document.getElementById('person-birth-place').value.trim(),
-            live_place: document.getElementById('person-live-place').value.trim(),
-            bio: document.getElementById('person-bio').value.trim()
-        };
-        if (relation === 'father' && targetId) {
-            data.father_id = targetId;
-        } else if (relation === 'son' && targetId) {
-            data.father_id = targetId;
-        } else if (relation === 'spouse' && targetId) {
-            data.spouse_of_id = targetId;
-        }
-        showLoading();
-        try {
-            let res;
-            if (id) {
-                res = await api.updatePerson(id, data);
-            } else {
-                res = await api.addPerson(data);
-            }
-            if (res.status === 'success') {
-                showToast(id ? '更新成功' : '添加成功', 'success');
-                this.closeModal('person-modal');
-                this.refreshCurrentPage();
-            } else {
-                showToast(res.message || '操作失败', 'error');
-            }
-        } catch (e) {
-            showToast('操作失败: ' + e.message, 'error');
-        } finally {
-            hideLoading();
-        }
-    }
-
-    refreshCurrentPage() {
-        const activeMenu = document.querySelector('.menu-item.active');
-        const page = activeMenu?.dataset.page;
-        if (page) this.navigateTo(page);
-    }
-
-    addRelative(type) {
-        if (!this.selectedTreePerson) return;
-        this.openAddPersonModal(type, this.selectedTreePerson.id);
-    }
-
-    editSelectedPerson() {
-        if (this.selectedTreePerson) {
-            this.openEditPersonModal(this.selectedTreePerson);
-        }
-    }
-
-    async loadTree() {
-        showLoading();
-        try {
-            const res = await api.getPeople();
-            if (res.status === 'success') {
-                this.peopleData = res.data || [];
-                this.buildPeopleDict();
-                this.buildTree();
-            }
-        } catch (e) {
-            showToast('加载失败', 'error');
-        } finally {
-            hideLoading();
-        }
-    }
-
-    buildTree() {
-        const container = document.getElementById('tree-canvas');
+        const container = document.getElementById('person-detail-content');
         if (!container) return;
-        const people = this.peopleData;
-        if (people.length === 0) {
-            container.innerHTML = '<p style="text-align: center; padding: 40px; color: var(--text-muted);">暂无数据</p>';
-            return;
-        }
-        const dict = {};
-        people.forEach(p => dict[p.id] = p);
-        const roots = people.filter(p => !p.father_id || !dict[p.father_id]);
-        const canvas = document.createElement('div');
-        canvas.style.position = 'relative';
-        canvas.style.minWidth = '100%';
-        canvas.style.minHeight = '100%';
-        canvas.style.transform = `scale(${this.treeZoom / 100})`;
-        canvas.style.transformOrigin = 'top left';
-        if (this.treeMode === 'vertical') {
-            this.buildVerticalTree(canvas, roots, dict, 50, 50);
-        } else {
-            this.buildHorizontalTree(canvas, roots, dict, 50, 50);
-        }
-        container.innerHTML = '';
-        container.appendChild(canvas);
-        this.setupTreeDrag(container);
-    }
-
-    buildVerticalTree(container, roots, dict, x, y) {
-        roots.forEach((root, index) => {
-            const subtree = this.buildSubtreeVertical(root, dict, x, y);
-            container.appendChild(subtree);
-            x += this.getSubtreeWidth(subtree) + 100;
-        });
-    }
-
-    buildSubtreeVertical(person, dict, x, y) {
-        const node = this.createTreeNode(person);
-        node.style.position = 'absolute';
-        node.style.left = x + 'px';
-        node.style.top = y + 'px';
-        const children = this.peopleData.filter(p => p.father_id == person.id);
-        if (children.length > 0) {
-            const childContainer = document.createElement('div');
-            childContainer.className = 'tree-children';
-            childContainer.style.display = 'flex';
-            childContainer.style.gap = '20px';
-            childContainer.style.marginTop = '40px';
-            let childX = 0;
-            const totalWidth = children.reduce((sum, c) => sum + this.getSubtreeWidthForPerson(c, dict, 0), 0) + (children.length - 1) * 20;
-            let startX = x + 50 - totalWidth / 2;
-            children.forEach((child, i) => {
-                const childSubtree = this.buildSubtreeVertical(child, dict, startX + childX, y + 120);
-                childContainer.appendChild(childSubtree);
-                childX += this.getSubtreeWidth(childSubtree) + 20;
-            });
-            const parentNode = node.querySelector('.tree-node-card');
-            if (parentNode) {
-                const line = document.createElement('div');
-                line.className = 'tree-connector';
-                line.style.cssText = 'position: absolute; left: 50%; top: 100%; width: 2px; height: 20px; background: var(--border-color); transform: translateX(-50%);';
-                parentNode.style.position = 'relative';
-                parentNode.appendChild(line);
-            }
-            node.appendChild(childContainer);
-        }
-        return node;
-    }
-
-    getSubtreeWidth(node) {
-        const card = node.querySelector('.tree-node-card');
-        return card ? card.offsetWidth : 100;
-    }
-
-    getSubtreeWidthForPerson(person, dict, depth) {
-        const children = this.peopleData.filter(p => p.father_id == person.id);
-        if (children.length === 0) return 120;
-        return children.reduce((sum, c) => sum + this.getSubtreeWidthForPerson(c, dict, depth + 1), 0) + (children.length - 1) * 20;
-    }
-
-    buildHorizontalTree(container, roots, dict, x, y) {
-        roots.forEach((root, index) => {
-            const subtree = this.buildSubtreeHorizontal(root, dict, x, y);
-            container.appendChild(subtree);
-            y += this.getSubtreeHeight(subtree) + 80;
-        });
-    }
-
-    buildSubtreeHorizontal(person, dict, x, y) {
-        const node = this.createTreeNode(person);
-        node.style.position = 'absolute';
-        node.style.left = x + 'px';
-        node.style.top = y + 'px';
-        const children = this.peopleData.filter(p => p.father_id == person.id);
-        if (children.length > 0) {
-            const childContainer = document.createElement('div');
-            childContainer.className = 'tree-children';
-            childContainer.style.cssText = 'display: flex; flex-direction: column; gap: 20px; margin-left: 40px;';
-            children.forEach(child => {
-                const childSubtree = this.buildSubtreeHorizontal(child, dict, x + 150, y);
-                childContainer.appendChild(childSubtree);
-                y += this.getSubtreeHeight(childSubtree) + 20;
-            });
-            node.appendChild(childContainer);
-        }
-        return node;
-    }
-
-    getSubtreeHeight(node) {
-        const card = node.querySelector('.tree-node-card');
-        return card ? card.offsetHeight : 60;
-    }
-
-    createTreeNode(person) {
-        const div = document.createElement('div');
-        div.className = 'tree-node';
-        div.dataset.id = person.id;
-        div.onclick = () => this.selectTreeNode(person.id);
-        const hasChildren = this.peopleData.some(p => p.father_id == person.id);
-        div.innerHTML = `
-            <div class="tree-node-card ${hasChildren ? 'has-children' : ''}">
-                <div class="tree-node-avatar ${person.gender === '女' ? 'female' : ''}">${getAvatarText(person)}</div>
-                <div class="tree-node-name">${getDisplayName(person)}</div>
-                <div class="tree-node-meta">${getGenerationText(person.shi_xi)}${person.ranking ? ' · ' + person.ranking : ''}</div>
-            </div>
-        `;
-        return div;
-    }
-
-    selectTreeNode(id) {
-        this.selectedTreePerson = this.peopleDict[id];
-        if (!this.selectedTreePerson) return;
-        document.querySelectorAll('.tree-node-card').forEach(card => card.classList.remove('selected'));
-        document.querySelector(`.tree-node[data-id="${id}"] .tree-node-card`)?.classList.add('selected');
-        document.getElementById('selected-name').textContent = this.selectedTreePerson.name;
-        document.getElementById('selected-info').innerHTML = this.renderSelectedInfo(this.selectedTreePerson);
-        this.enableTreeActions();
-        document.getElementById('tree-side-panel')?.classList.remove('hidden');
-    }
-
-    renderSelectedInfo(p) {
+        const spouse = this.isSpouse(p);
+        const alive = this.isAlive(p);
         const father = p.father_id ? this.peopleDict[p.father_id] : null;
         const children = this.peopleData.filter(c => c.father_id == p.id);
-        return `
-            <div class="info-row"><span class="info-label">性别</span><span class="info-value">${p.gender || '-'}</span></div>
-            <div class="info-row"><span class="info-label">字辈</span><span class="info-value">${p.generation || '-'}</span></div>
-            <div class="info-row"><span class="info-label">世系</span><span class="info-value">${getGenerationText(p.shi_xi) || '-'}</span></div>
-            <div class="info-row"><span class="info-label">排行</span><span class="info-value">${p.ranking || '-'}</span></div>
-            <div class="info-row"><span class="info-label">手机</span><span class="info-value">${p.phone || '-'}</span></div>
-            <div class="info-row"><span class="info-label">父亲</span><span class="info-value">${father ? father.name : '-'}</span></div>
-            <div class="info-row"><span class="info-label">子女</span><span class="info-value">${children.length}人</span></div>
-            <div class="info-row"><span class="info-label">状态</span><span class="info-value">${p.is_alive == 1 || p.is_alive === true ? '健在' : '去世'}</span></div>
-        `;
-    }
+        const role = getCurrentRole();
+        const canEdit = isAdmin() || isSelf(p);
+        const canDelete = isAdmin() && children.length === 0;
+        const canBind = !isGuest() && isVerifiedUser() && !isAdmin() && !isSelf(p);
+        const canUnbind = !isAdmin() && this.currentUser?.personId && String(p.id) === String(this.currentUser.personId);
 
-    enableTreeActions() {
-        document.getElementById('btn-add-father')?.removeAttribute('disabled');
-        document.getElementById('btn-add-son')?.removeAttribute('disabled');
-        document.getElementById('btn-add-spouse')?.removeAttribute('disabled');
-        document.getElementById('btn-add-sibling')?.removeAttribute('disabled');
-        document.getElementById('btn-edit-person')?.removeAttribute('disabled');
-    }
+        const calcAge = (b, d) => { if (!b) return null; const by = parseInt(b.substring(0,4)); if (isNaN(by)) return null; const dy = d ? parseInt(d.substring(0,4)) : new Date().getFullYear(); return isNaN(dy) ? null : dy - by; };
+        const deathAge = calcAge(p.birth_date, p.death_date);
 
-    closeTreePanel() {
-        document.getElementById('tree-side-panel')?.classList.add('hidden');
-        this.selectedTreePerson = null;
-        document.querySelectorAll('.tree-node-card').forEach(card => card.classList.remove('selected'));
-    }
-
-    setupTreeDrag(container) {
-        container.addEventListener('mousedown', e => {
-            if (e.target.closest('.tree-node')) return;
-            this.isDragging = true;
-            this.dragStartX = e.clientX;
-            this.dragStartY = e.clientY;
-            this.scrollStartX = container.scrollLeft;
-            this.scrollStartY = container.scrollTop;
-            container.style.cursor = 'grabbing';
-        });
-        container.addEventListener('mousemove', e => {
-            if (!this.isDragging) return;
-            const dx = e.clientX - this.dragStartX;
-            const dy = e.clientY - this.dragStartY;
-            container.scrollLeft = this.scrollStartX - dx;
-            container.scrollTop = this.scrollStartY - dy;
-        });
-        container.addEventListener('mouseup', () => {
-            this.isDragging = false;
-            container.style.cursor = 'default';
-        });
-        container.addEventListener('mouseleave', () => {
-            this.isDragging = false;
-            container.style.cursor = 'default';
-        });
-        container.addEventListener('wheel', e => {
-            if (e.ctrlKey) {
-                e.preventDefault();
-                this.zoomTree(e.deltaY > 0 ? -10 : 10);
-            }
-        });
-    }
-
-    zoomTree(delta) {
-        this.treeZoom = Math.max(30, Math.min(200, this.treeZoom + delta));
-        document.getElementById('tree-zoom-level').textContent = this.treeZoom + '%';
-        const canvas = document.querySelector('#tree-canvas > div');
-        if (canvas) {
-            canvas.style.transform = `scale(${this.treeZoom / 100})`;
-        }
-    }
-
-    resetTreeZoom() {
-        this.treeZoom = 100;
-        document.getElementById('tree-zoom-level').textContent = '100%';
-        const canvas = document.querySelector('#tree-canvas > div');
-        if (canvas) {
-            canvas.style.transform = 'scale(1)';
-        }
-    }
-
-    setTreeMode(mode) {
-        this.treeMode = mode;
-        document.getElementById('tree-mode-vertical').classList.toggle('active', mode === 'vertical');
-        document.getElementById('tree-mode-horizontal').classList.toggle('active', mode === 'horizontal');
-        this.buildTree();
-    }
-
-    async loadBaota(showBefore17 = true) {
-        showLoading();
-        try {
-            const res = await api.getPeople();
-            if (res.status === 'success') {
-                this.peopleData = res.data || [];
-                this.buildPeopleDict();
-                let people = this.peopleData;
-                if (!showBefore17) {
-                    people = people.filter(p => p.shi_xi >= 17);
-                }
-                this.buildBaotaTree(people);
-            }
-        } catch (e) {
-            showToast('加载失败', 'error');
-        } finally {
-            hideLoading();
-        }
-    }
-
-    buildBaotaTree(people) {
-        const container = document.getElementById('baota-canvas');
-        if (!container) return;
-        if (people.length === 0) {
-            container.innerHTML = '<p style="text-align: center; padding: 40px; color: var(--text-muted);">暂无数据</p>';
-            return;
-        }
-        const dict = {};
-        people.forEach(p => dict[p.id] = p);
-        const roots = people.filter(p => !p.father_id || !dict[p.father_id]);
-        const canvas = document.createElement('div');
-        canvas.style.position = 'relative';
-        canvas.style.minWidth = '100%';
-        canvas.style.minHeight = '100%';
-        canvas.style.transform = `scale(${this.baotaZoom / 100})`;
-        canvas.style.transformOrigin = 'top left';
-        const spacing = { x: 160, y: 200 };
-        this.layoutBaotaNode(canvas, roots, dict, 100, 100, spacing);
-        container.innerHTML = '';
-        container.appendChild(canvas);
-        this.setupBaotaDrag(container);
-    }
-
-    layoutBaotaNode(container, nodes, dict, x, y, spacing) {
-        let currentX = x;
-        nodes.forEach(node => {
-            const nodeEl = this.createBaotaNode(node);
-            nodeEl.style.position = 'absolute';
-            nodeEl.style.left = currentX + 'px';
-            nodeEl.style.top = y + 'px';
-            container.appendChild(nodeEl);
-            const children = this.peopleData.filter(p => p.father_id == node.id);
-            if (children.length > 0) {
-                const childX = currentX + (spacing.x - 120) / 2;
-                const childY = y + spacing.y;
-                const childContainer = document.createElement('div');
-                childContainer.className = 'baota-children';
-                this.layoutBaotaNode(childContainer, children, dict, childX, childY, spacing);
-                container.appendChild(childContainer);
-            }
-            currentX += spacing.x;
-        });
-    }
-
-    createBaotaNode(person) {
-        const div = document.createElement('div');
-        div.className = 'tree-node';
-        div.dataset.id = person.id;
-        div.onclick = () => this.selectBaotaNode(person.id);
-        const children = this.peopleData.filter(p => p.father_id == person.id);
-        div.innerHTML = `
-            <div class="tree-node-card ${children.length > 0 ? 'has-children' : ''}">
-                <div class="tree-node-avatar ${person.gender === '女' ? 'female' : ''}">${getAvatarText(person)}</div>
-                <div class="tree-node-name">${getDisplayName(person)}</div>
-                <div class="tree-node-meta">${getGenerationText(person.shi_xi)}${person.ranking ? ' · ' + person.ranking : ''}</div>
-                ${children.length > 0 ? `<span style="position: absolute; top: 5px; right: 5px; background: var(--success); color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px;">${children.length}</span>` : ''}
+        container.innerHTML = `
+        <div class="detail-back-bar">
+            <button class="btn btn-small btn-outline" onclick="app.navigateTo('people')"><i class="fas fa-arrow-left"></i> 返回</button>
+            ${canEdit ? `<button class="btn btn-small btn-primary" onclick="app.navigateTo('person-edit',{id:${p.id}})"><i class="fas fa-edit"></i> 编辑</button>` : ''}
+        </div>
+        <div class="detail-header">
+            ${this.renderGenderAvatar(p, 'detail-avatar', 80)}
+            <h2>${getDisplayName(p)}</h2>
+            <p>${p.generation && !spouse ? `字辈: ${p.generation} · ` : ''}${p.shi_xi && !spouse ? `第${p.shi_xi}世` : ''}</p>
+            <div class="detail-badges">
+                <span class="badge" style="background:${p.gender==='男'?'#dbeafe':'#fce7f3'};color:${p.gender==='男'?'#1e40af':'#be185d'};">${p.gender}</span>
+                <span class="badge ${alive?'badge-alive':'badge-deceased'}">${alive?'健在':'已逝'}</span>
+                ${p.ranking?`<span class="badge" style="background:#e0e7ff;color:#4338ca;">${p.ranking}</span>`:''}
             </div>
-        `;
-        return div;
-    }
-
-    selectBaotaNode(id) {
-        this.selectedBaotaPerson = this.peopleDict[id];
-        if (!this.selectedBaotaPerson) return;
-        document.querySelectorAll('#baota-canvas .tree-node-card').forEach(card => card.classList.remove('selected'));
-        document.querySelector(`#baota-canvas .tree-node[data-id="${id}"] .tree-node-card`)?.classList.add('selected');
-        document.getElementById('baota-selected-name').textContent = this.selectedBaotaPerson.name;
-        document.getElementById('baota-selected-info').innerHTML = this.renderSelectedInfo(this.selectedBaotaPerson);
-        this.enableBaotaActions();
-        document.getElementById('baota-side-panel')?.classList.remove('hidden');
-    }
-
-    enableBaotaActions() {
-        document.getElementById('baota-btn-add-father')?.removeAttribute('disabled');
-        document.getElementById('baota-btn-add-son')?.removeAttribute('disabled');
-        document.getElementById('baota-btn-add-spouse')?.removeAttribute('disabled');
-        document.getElementById('baota-btn-add-sibling')?.removeAttribute('disabled');
-        document.getElementById('baota-btn-edit-person')?.removeAttribute('disabled');
-    }
-
-    closeBaotaPanel() {
-        document.getElementById('baota-side-panel')?.classList.add('hidden');
-        this.selectedBaotaPerson = null;
-        document.querySelectorAll('#baota-canvas .tree-node-card').forEach(card => card.classList.remove('selected'));
-    }
-
-    editSelectedBaotaPerson() {
-        if (this.selectedBaotaPerson) {
-            this.openEditPersonModal(this.selectedBaotaPerson);
-        }
-    }
-
-    setupBaotaDrag(container) {
-        container.addEventListener('mousedown', e => {
-            if (e.target.closest('.tree-node')) return;
-            this.isDragging = true;
-            this.dragStartX = e.clientX;
-            this.dragStartY = e.clientY;
-            this.scrollStartX = container.scrollLeft;
-            this.scrollStartY = container.scrollTop;
-            container.style.cursor = 'grabbing';
-        });
-        container.addEventListener('mousemove', e => {
-            if (!this.isDragging) return;
-            const dx = e.clientX - this.dragStartX;
-            const dy = e.clientY - this.dragStartY;
-            container.scrollLeft = this.scrollStartX - dx;
-            container.scrollTop = this.scrollStartY - dy;
-        });
-        container.addEventListener('mouseup', () => {
-            this.isDragging = false;
-            container.style.cursor = 'default';
-        });
-        container.addEventListener('mouseleave', () => {
-            this.isDragging = false;
-            container.style.cursor = 'default';
-        });
-    }
-
-    zoomBaota(delta) {
-        this.baotaZoom = Math.max(30, Math.min(200, this.baotaZoom + delta));
-        document.getElementById('baota-zoom-level').textContent = this.baotaZoom + '%';
-        const canvas = document.querySelector('#baota-canvas > div');
-        if (canvas) {
-            canvas.style.transform = `scale(${this.baotaZoom / 100})`;
-        }
-    }
-
-    resetBaotaZoom() {
-        this.baotaZoom = 100;
-        document.getElementById('baota-zoom-level').textContent = '100%';
-        const canvas = document.querySelector('#baota-canvas > div');
-        if (canvas) {
-            canvas.style.transform = 'scale(1)';
-        }
-    }
-
-    async loadGenerationView() {
-        showLoading();
-        try {
-            const res = await api.getPeople();
-            if (res.status === 'success') {
-                this.peopleData = res.data || [];
-                this.buildPeopleDict();
-                const gens = [...new Set(this.peopleData.map(p => p.shi_xi).filter(s => s))].sort((a, b) => a - b);
-                const genSelect = document.getElementById('gen-select');
-                genSelect.innerHTML = gens.map(g => `<option value="${g}">第${g}世</option>`).join('');
-                if (gens.length > 0) {
-                    this.currentGen = gens[0];
-                    genSelect.value = this.currentGen;
-                    this.loadGeneration(this.currentGen);
-                }
-            }
-        } catch (e) {
-            showToast('加载失败', 'error');
-        } finally {
-            hideLoading();
-        }
-    }
-
-    loadGeneration(gen) {
-        this.currentGen = parseInt(gen);
-        const people = this.peopleData.filter(p => p.shi_xi == this.currentGen);
-        const container = document.getElementById('gen-grid');
-        if (!container) return;
-        if (people.length === 0) {
-            container.innerHTML = '<p style="text-align: center; padding: 40px; color: var(--text-muted);">该世系暂无数据</p>';
-            return;
-        }
-        const sorted = people.sort((a, b) => {
-            const rankOrder = ['老大', '老二', '老三', '老四', '老五', '老六', '老七', '老八', '老九'];
-            const aIdx = rankOrder.indexOf(a.ranking);
-            const bIdx = rankOrder.indexOf(b.ranking);
-            if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
-            if (aIdx !== -1) return -1;
-            if (bIdx !== -1) return 1;
-            return a.name.localeCompare(b.name);
-        });
-        container.innerHTML = sorted.map(p => `
-            <div class="gen-card" onclick="app.showPersonDetail(${p.id})">
-                <div class="gen-card-header">
-                    <span class="gen-card-title">${p.name}</span>
-                    <span class="gen-card-count">${p.ranking || ''}</span>
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-secondary);">
-                    <div><i class="fas fa-venus-mars"></i> ${p.gender || '-'}</div>
-                    <div><i class="fas fa-ring"></i> ${p.is_married == 1 || p.is_married === true ? '已婚' : '未婚'}</div>
-                    <div><i class="fas fa-heart"></i> ${p.is_alive == 1 || p.is_alive === true ? '健在' : '去世'}</div>
-                    <div><i class="fas fa-phone"></i> ${p.phone || '-'}</div>
-                </div>
+        </div>
+        <div class="card">
+            <h3><i class="fas fa-info-circle"></i> 基本信息</h3>
+            <div class="detail-grid">
+                ${p.alias?`<div class="detail-item"><div class="detail-item-label">别名</div><div class="detail-item-value">${p.alias}</div></div>`:''}
+                <div class="detail-item"><div class="detail-item-label">排行</div><div class="detail-item-value">${p.ranking||'-'}</div></div>
+                <div class="detail-item"><div class="detail-item-label">父亲</div><div class="detail-item-value">${father?`<a href="javascript:app.navigateTo('person-detail',{id:${father.id}})">${getDisplayName(father)}</a>`:'-'}</div></div>
+                <div class="detail-item"><div class="detail-item-label">出生</div><div class="detail-item-value">${p.birth_date||'-'}${p.birth_calendar?`(${p.birth_calendar})`:''}</div></div>
+                ${!alive?`<div class="detail-item"><div class="detail-item-label">去世</div><div class="detail-item-value">${p.death_date||'-'}${p.death_calendar?`(${p.death_calendar})`:''}</div></div>`:''}
+                ${deathAge!==null?`<div class="detail-item"><div class="detail-item-label">享年</div><div class="detail-item-value">${deathAge}岁</div></div>`:''}
+                <div class="detail-item"><div class="detail-item-label">籍贯</div><div class="detail-item-value">${p.birth_place||'-'}</div></div>
+                <div class="detail-item"><div class="detail-item-label">现居地</div><div class="detail-item-value">${p.live_place||'-'}</div></div>
+                ${p.move_info?`<div class="detail-item"><div class="detail-item-label">迁出</div><div class="detail-item-value">${p.move_info}</div></div>`:''}
+                ${p.remark?`<div class="detail-item"><div class="detail-item-label">备注</div><div class="detail-item-value">${p.remark}</div></div>`:''}
             </div>
-        `).join('');
+        </div>
+        ${p.bio?`<div class="card"><h3><i class="fas fa-file-alt"></i> 生平简介</h3><p style="font-size:14px;color:var(--text-secondary);line-height:1.8;">${p.bio}</p></div>`:''}
+        ${p.spouse_name||p.spouse_person?`
+        <div class="card"><h3><i class="fas fa-heart"></i> 配偶信息</h3><div class="detail-grid">
+            <div class="detail-item"><div class="detail-item-label">配偶</div><div class="detail-item-value">${p.spouse_person?`<a href="javascript:app.navigateTo('person-detail',{id:${p.spouse_person.id}})">${maskName(p.spouse_person.name,role)}</a>`:(maskName(p.spouse_name,role)||'-')}</div></div>
+            ${p.spouse_person?`<div class="detail-item"><div class="detail-item-label">配偶生日</div><div class="detail-item-value">${p.spouse_person.birth_date||'-'}</div></div>
+            <div class="detail-item"><div class="detail-item-label">配偶状态</div><div class="detail-item-value">${this.isAlive(p.spouse_person)?'健在':'已逝'}</div></div>`:''}
+        </div></div>`:''}
+        ${children.length>0?`
+        <div class="card"><h3><i class="fas fa-users"></i> 子女 (${children.length}人)</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">${children.map(c=>`<span class="badge badge-alive" style="cursor:pointer;" onclick="app.navigateTo('person-detail',{id:${c.id}})">${getDisplayName(c)}</span>`).join('')}</div></div>`:''}
+        <div class="detail-actions">
+            ${canBind?`<button class="btn btn-primary" onclick="app.bindPerson(${p.id})"><i class="fas fa-link"></i> 绑定此人物</button>`:''}
+            ${canUnbind?`<button class="btn btn-outline" onclick="app.unbindPerson()"><i class="fas fa-unlink"></i> 解绑人物</button>`:''}
+            ${canDelete?`<button class="btn btn-danger" onclick="app.deletePerson(${p.id})"><i class="fas fa-trash"></i> 删除</button>`:''}
+            ${isAdmin()?`<button class="btn btn-outline" onclick="app.createBindToken(${p.id})"><i class="fas fa-share-alt"></i> 邀请链接</button>`:''}
+        </div>`;
     }
 
-    prevGeneration() {
-        const gens = [...new Set(this.peopleData.map(p => p.shi_xi).filter(s => s))].sort((a, b) => a - b);
-        const idx = gens.indexOf(this.currentGen);
-        if (idx > 0) {
-            this.currentGen = gens[idx - 1];
-            document.getElementById('gen-select').value = this.currentGen;
-            this.loadGeneration(this.currentGen);
-        }
-    }
-
-    nextGeneration() {
-        const gens = [...new Set(this.peopleData.map(p => p.shi_xi).filter(s => s))].sort((a, b) => a - b);
-        const idx = gens.indexOf(this.currentGen);
-        if (idx < gens.length - 1) {
-            this.currentGen = gens[idx + 1];
-            document.getElementById('gen-select').value = this.currentGen;
-            this.loadGeneration(this.currentGen);
-        }
-    }
-
-    async loadStats() {
+    async bindPerson(personId) {
         showLoading();
         try {
-            const res = await api.getPeople();
-            if (res.status === 'success') {
-                this.peopleData = res.data || [];
-                this.buildPeopleDict();
-                this.renderStats();
-            }
-        } catch (e) {
-            showToast('加载失败', 'error');
-        } finally {
-            hideLoading();
-        }
+            const res = await api.bindWechatPerson(personId);
+            if (res.status === 'success') { showToast('绑定成功', 'success'); this.currentUser.personId = personId; localStorage.setItem(USER_KEY, JSON.stringify(this.currentUser)); this.navigateTo('person-detail', { id: personId }); }
+            else showToast(res.message || '绑定失败', 'error');
+        } catch (e) { showToast('绑定失败', 'error'); }
+        finally { hideLoading(); }
     }
 
-    renderStats() {
-        const gens = {};
-        this.peopleData.forEach(p => {
-            const g = p.shi_xi || '未知';
-            if (!gens[g]) gens[g] = { total: 0, male: 0, female: 0 };
-            gens[g].total++;
-            if (p.gender === '男') gens[g].male++;
-            else if (p.gender === '女') gens[g].female++;
-        });
-        const container = document.getElementById('generation-stats');
-        const sortedGens = Object.keys(gens).sort((a, b) => parseInt(a) - parseInt(b));
-        container.innerHTML = sortedGens.map(g => `
-            <div class="gen-stat-item">
-                <div class="gen-stat-header">第${g}世</div>
-                <div class="gen-stat-body">
-                    <div class="gen-stat-total">${gens[g].total}人</div>
-                    <div class="gen-stat-detail">
-                        <span style="color: var(--primary);"><i class="fas fa-male"></i> ${gens[g].male}</span>
-                        <span style="color: #ec4899;"><i class="fas fa-female"></i> ${gens[g].female}</span>
-                    </div>
-                </div>
-            </div>
-        `).join('');
-        const totalMale = this.peopleData.filter(p => p.gender === '男').length;
-        const totalFemale = this.peopleData.filter(p => p.gender === '女').length;
-        const total = totalMale + totalFemale || 1;
-        const malePercent = Math.round((totalMale / total) * 100);
-        const femalePercent = 100 - malePercent;
-        document.getElementById('ratio-male').style.width = malePercent + '%';
-        document.getElementById('ratio-female').style.width = femalePercent + '%';
-        document.getElementById('male-percent').textContent = malePercent + '%';
-        document.getElementById('female-percent').textContent = femalePercent + '%';
-        const married = this.peopleData.filter(p => p.is_married == 1 || p.is_married === true).length;
-        const unmarried = this.peopleData.length - married;
-        document.getElementById('married-count').textContent = married;
-        document.getElementById('unmarried-count').textContent = unmarried;
-        document.getElementById('widowed-count').textContent = 0;
-    }
-
-    async loadUsers() {
-        if (this.currentUser?.role !== 'admin' && this.currentUser?.role !== 'super') {
-            showToast('无权限', 'error');
-            return;
-        }
-        showLoading();
-        try {
-            const res = await api.getUsers();
-            if (res.status === 'success') {
-                this.renderUsers(res.data || []);
-            }
-        } catch (e) {
-            showToast('加载失败', 'error');
-        } finally {
-            hideLoading();
-        }
-    }
-
-    renderUsers(users) {
-        const container = document.getElementById('users-list');
-        if (!container) return;
-        container.innerHTML = users.map(u => `
-            <div class="user-item">
-                <div class="user-info">
-                    <div class="user-avatar"><i class="fas fa-user"></i></div>
-                    <div class="user-details">
-                        <h4>${u.username || '-'}</h4>
-                        <p>${u.phone || '-'}</p>
-                    </div>
-                </div>
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span class="user-role ${u.role === 'super' ? 'role-super' : u.role === 'admin' ? 'role-admin' : 'role-user'}">${u.role === 'super' ? '超级管理员' : u.role === 'admin' ? '管理员' : '普通用户'}</span>
-                    <div class="user-actions">
-                        <button class="btn btn-small btn-outline" onclick="app.editUser(${u.id})"><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-small btn-outline" onclick="app.changeUserPassword(${u.id})"><i class="fas fa-key"></i></button>
-                        <button class="btn btn-small btn-danger" onclick="app.deleteUser(${u.id})"><i class="fas fa-trash"></i></button>
-                    </div>
-                </div>
-            </div>
-        `).join('');
-    }
-
-    openAddUserModal() {
-        document.getElementById('user-modal-title').textContent = '添加账号';
-        document.getElementById('user-id').value = '';
-        document.getElementById('user-username').value = '';
-        document.getElementById('user-phone').value = '';
-        document.getElementById('user-password').value = '';
-        document.getElementById('user-role').value = 'admin';
-        this.showModal('user-modal');
-    }
-
-    async editUser(id) {
-        showToast('编辑功能开发中', 'info');
-    }
-
-    async changeUserPassword(id) {
-        const newPassword = prompt('请输入新密码:');
-        if (!newPassword) return;
-        showLoading();
-        try {
-            const res = await api.changePassword(id, newPassword);
-            if (res.status === 'success') {
-                showToast('密码修改成功', 'success');
-            } else {
-                showToast(res.message || '修改失败', 'error');
-            }
-        } catch (e) {
-            showToast('修改失败', 'error');
-        } finally {
-            hideLoading();
-        }
-    }
-
-    async deleteUser(id) {
-        document.getElementById('confirm-title').textContent = '确认删除';
-        document.getElementById('confirm-message').textContent = '确定要删除这个账号吗？此操作不可恢复！';
-        document.getElementById('confirm-ok').onclick = async () => {
+    async unbindPerson() {
+        this.showConfirm('解绑人物', '确定解绑当前绑定的人物吗？', async () => {
             showLoading();
             try {
-                const res = await api.deleteUser(id);
-                if (res.status === 'success') {
-                    showToast('删除成功', 'success');
-                    this.closeModal('confirm-modal');
-                    this.loadUsers();
-                } else {
-                    showToast(res.message || '删除失败', 'error');
-                }
-            } catch (e) {
-                showToast('删除失败', 'error');
-            } finally {
-                hideLoading();
-            }
-        };
-        this.showModal('confirm-modal');
+                const res = await api.bindWechatPerson(null);
+                if (res.status === 'success') { showToast('已解绑', 'success'); this.currentUser.personId = ''; localStorage.setItem(USER_KEY, JSON.stringify(this.currentUser)); this.navigateTo('me'); }
+                else showToast(res.message || '解绑失败', 'error');
+            } catch (e) { showToast('解绑失败', 'error'); }
+            finally { hideLoading(); }
+        });
     }
 
-    async saveUser() {
-        const id = document.getElementById('user-id').value;
-        const username = document.getElementById('user-username').value.trim();
-        const phone = document.getElementById('user-phone').value.trim();
-        const password = document.getElementById('user-password').value;
-        const role = document.getElementById('user-role').value;
-        if (!username || !password) {
-            showToast('请填写必填项', 'error');
-            return;
-        }
-        const data = { username, phone, password, role };
+    async deletePerson(id) {
+        this.showConfirm('删除人员', '确定删除此人吗？此操作不可恢复！', async () => {
+            showLoading();
+            try {
+                const res = await api.deletePerson(id);
+                if (res.status === 'success') { showToast('删除成功', 'success'); this.navigateTo('people'); }
+                else showToast(res.message || '删除失败', 'error');
+            } catch (e) { showToast('删除失败', 'error'); }
+            finally { hideLoading(); }
+        });
+    }
+
+    async createBindToken(personId) {
+        try {
+            const res = await api.createWechatBindToken(personId, 24);
+            if (res.status === 'success' && res.bind_token) {
+                const url = `${window.location.origin}${window.location.pathname}?bind_token=${res.bind_token}`;
+                navigator.clipboard?.writeText(url).then(() => showToast('链接已复制到剪贴板', 'success')).catch(() => {
+                    prompt('请复制以下链接：', url);
+                });
+            } else showToast(res.message || '创建失败', 'error');
+        } catch (e) { showToast('创建失败', 'error'); }
+    }
+
+    // ═══ 人员编辑 ═══
+    loadPersonEdit(params) {
+        showToast('人员编辑页开发中...', 'info');
+    }
+
+    openAddPersonModal() { this.navigateTo('person-edit', { mode: 'add' }); }
+
+    // ═══ 字辈列表 ═══
+    async loadGenerationNames() {
         showLoading();
         try {
-            let res;
-            if (id) {
-                res = await api.updateUser(id, data);
-            } else {
-                res = await api.addUser(data);
-            }
-            if (res.status === 'success') {
-                showToast(id ? '更新成功' : '添加成功', 'success');
-                this.closeModal('user-modal');
-                this.loadUsers();
-            } else {
-                showToast(res.message || '操作失败', 'error');
-            }
-        } catch (e) {
-            showToast('操作失败', 'error');
-        } finally {
-            hideLoading();
-        }
+            const res = await api.getGenerationNames();
+            if (res.status === 'success') this.renderGenerationNames(res.data || []);
+            this.loadAnnouncementsForPage('generation-names', 'gen-names-announcement-bar', 'gen-names-ann-scroll-area', 'gen-names-ann-text');
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
     }
 
-    async exportData() {
-        showLoading();
-        try {
-            const res = await api.exportData();
-            if (res.status === 'success' && res.url) {
-                window.open(res.url, '_blank');
-                showToast('导出成功', 'success');
-            } else {
-                showToast(res.message || '导出失败', 'error');
-            }
-        } catch (e) {
-            showToast('导出失败', 'error');
-        } finally {
-            hideLoading();
-        }
-    }
-
-    async importData(file) {
-        showToast('导入功能开发中，需要后端支持', 'info');
-    }
-
-    async backup() {
-        showLoading();
-        try {
-            const res = await api.backup();
-            if (res.status === 'success') {
-                showToast('备份成功', 'success');
-                this.loadBackups();
-            } else {
-                showToast(res.message || '备份失败', 'error');
-            }
-        } catch (e) {
-            showToast('备份失败', 'error');
-        } finally {
-            hideLoading();
-        }
-    }
-
-    async loadBackups() {
-        showLoading();
-        try {
-            const res = await api.getBackups();
-            if (res.status === 'success') {
-                this.renderBackups(res.data || []);
-            }
-        } catch (e) {
-            showToast('加载失败', 'error');
-        } finally {
-            hideLoading();
-        }
-    }
-
-    renderBackups(backups) {
-        const container = document.getElementById('backup-list');
+    renderGenerationNames(data) {
+        const container = document.getElementById('generation-names-list');
         if (!container) return;
-        if (backups.length === 0) {
-            container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">暂无备份记录</p>';
-            return;
-        }
-        container.innerHTML = backups.map(b => `
-            <div class="backup-item">
-                <span><i class="fas fa-database"></i> ${b.name || '备份'} - ${b.created_at || ''}</span>
-                <button class="btn btn-small btn-outline" onclick="app.restoreBackup('${b.id}')"><i class="fas fa-upload"></i> 恢复</button>
+        const adminHint = isAdmin() ? '<div class="admin-hint-bar">💡 管理员可点击"修改"统一设置字辈，保存后自动同步该世系所有人员</div>' : '';
+        container.innerHTML = adminHint + data.map(g => `
+            <div class="gen-name-card">
+                <div class="gen-name-header">
+                    <span class="gen-name-shi">第${g.shi_xi}世</span>
+                    <span class="gen-name-value">${g.display_name || g.name || '未设置'}</span>
+                    <span class="gen-name-count">${g.people_count || 0}人</span>
+                    ${g.is_unified === 0 && g.name ? '<span class="gen-name-warning">⚠️ 未统一</span>' : ''}
+                    ${isAdmin() ? `<button class="btn btn-small btn-outline" onclick="app.editGenerationName(${g.shi_xi},'${g.name||''}')">修改</button>` : ''}
+                </div>
             </div>
         `).join('');
     }
 
-    showRestoreConfirm() {
-        document.getElementById('confirm-title').textContent = '确认恢复';
-        document.getElementById('confirm-message').textContent = '确定要恢复备份吗？当前数据将被覆盖！';
-        document.getElementById('confirm-ok').onclick = () => {
-            showToast('请选择要恢复的备份', 'info');
-            this.closeModal('confirm-modal');
-        };
-        this.showModal('confirm-modal');
-    }
-
-    async restoreBackup(id) {
+    async editGenerationName(shiXi, currentName) {
+        const newName = prompt(`修改第${shiXi}世字辈：`, currentName);
+        if (newName === null) return;
         showLoading();
         try {
-            const res = await api.restore(id);
+            const res = await api.updateGenerationName(shiXi, newName);
+            if (res.status === 'success') { showToast(`已同步${res.synced || 0}人`, 'success'); this.loadGenerationNames(); }
+            else showToast(res.message || '修改失败', 'error');
+        } catch (e) { showToast('修改失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    // ═══ 各世统计 ═══
+    async loadGenStats() {
+        showLoading();
+        try {
+            const res = await api.getPeople();
             if (res.status === 'success') {
-                showToast('恢复成功', 'success');
-                this.closeModal('confirm-modal');
-            } else {
-                showToast(res.message || '恢复失败', 'error');
+                this.peopleData = res.data || []; this.buildPeopleDict();
+                this.renderGenStats();
             }
-        } catch (e) {
-            showToast('恢复失败', 'error');
-        } finally {
-            hideLoading();
-        }
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
     }
 
-    loadPhotos() {
-        const container = document.getElementById('photos-grid');
+    renderGenStats() {
+        const container = document.getElementById('gen-stats-content');
         if (!container) return;
-        container.innerHTML = '<p style="text-align: center; padding: 40px; color: var(--text-muted);">照片管理功能开发中</p>';
+        const nonSp = this.peopleData.filter(p => !this.isSpouse(p));
+        const gens = {};
+        nonSp.forEach(p => {
+            const g = p.shi_xi || '未知';
+            if (!gens[g]) gens[g] = { count: 0, maleCount: 0, aliveCount: 0, aliveMaleCount: 0 };
+            gens[g].count++;
+            if (p.gender === '男') gens[g].maleCount++;
+            if (this.isAlive(p)) { gens[g].aliveCount++; if (p.gender === '男') gens[g].aliveMaleCount++; }
+        });
+        const sorted = Object.keys(gens).sort((a, b) => parseInt(a) - parseInt(b));
+        const totalPeople = nonSp.length;
+        const totalMale = nonSp.filter(p => p.gender === '男').length;
+        container.innerHTML = `
+        <div class="gen-stats-overview">
+            <div class="gen-overview-card"><span class="gen-overview-num">${totalPeople}</span><span class="gen-overview-label">总人数</span></div>
+            <div class="gen-overview-card"><span class="gen-overview-num">${totalMale}</span><span class="gen-overview-label">男丁数</span></div>
+            <div class="gen-overview-card"><span class="gen-overview-num">${sorted.length}</span><span class="gen-overview-label">世代数</span></div>
+        </div>
+        <div class="gen-stats-grid">
+            ${sorted.map(g => `
+            <div class="gen-stat-card" onclick="app.navigateTo('people',{filterShiXi:${g}})">
+                <div class="gen-stat-shi">第${g}世</div>
+                <div class="gen-stat-num">${gens[g].count}</div>
+                <div class="gen-stat-sub">男${gens[g].maleCount}</div>
+            </div>`).join('')}
+        </div>
+        <div class="gen-stats-tip">💡 点击世代卡片可跳转到人员列表</div>`;
     }
-}
 
-const app = new ZupuApp();
+    // ═══ 我的页面 ═══
+    async loadMe() {
+        showLoading();
+        try {
+            // 刷新用户信息
+            if (!isGuest()) {
+                try {
+                    const meRes = await api.getMe();
+                    if (meRes.status === 'success' && meRes.data) {
+                        const me = meRes.data;
+                        this.currentUser = {
+                            ...this.currentUser,
+                            nickname: me.nickname || this.currentUser.nickname,
+                            avatar_url: me.avatar_url || this.currentUser.avatar_url,
+                            phone: me.phone || this.currentUser.phone,
+                            personId: me.person_summary?.id || this.currentUser.personId,
+                            role: me.role || this.currentUser.role,
+                            verified: me.verified || this.currentUser.verified,
+                            li_shi_id: me.li_shi_id || this.currentUser.li_shi_id,
+                            person_summary: me.person_summary
+                        };
+                        localStorage.setItem(USER_KEY, JSON.stringify(this.currentUser));
+                    }
+                } catch (e) { /* 静默 */ }
+            }
+            this.renderMe();
+            this.loadAnnouncementsForPage('me', 'me-announcement-bar', 'me-ann-scroll-area', 'me-ann-text');
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    renderMe() {
+        const container = document.getElementById('me-content');
+        if (!container) return;
+        const u = this.currentUser || {};
+        const role = u.role || 'guest';
+        const isGuestUser = role === 'guest';
+        const isAdminRole = role === 'admin' || role === 'super_admin';
+        const isVerified = role === 'member' || role === 'admin' || role === 'super_admin';
+        const isWechatLogin = u.loginType === 'wechat';
+        const personId = u.personId || u.person_id;
+        const person = personId ? this.peopleDict[personId] : null;
+
+        // 头像
+        const avatarHtml = u.avatar_url && !isGuestUser
+            ? `<img src="${u.avatar_url}" class="me-avatar-img" onclick="app.editAvatar()">`
+            : `<div class="me-avatar-default" onclick="${isWechatLogin ? 'app.editAvatar()' : ''}">${(u.nickname || u.username || '游')[0]}</div>`;
+
+        // 角色标签
+        const roleLabels = { guest: '匿名游客', user: '未认证', member: '家族成员', admin: '管理员', super_admin: '超级管理员' };
+
+        container.innerHTML = `
+        <!-- 个人信息卡片 -->
+        <div class="card me-profile-card">
+            <div class="me-profile-top">
+                ${avatarHtml}
+                <div class="me-profile-info">
+                    <div class="me-name-row">
+                        <span class="me-name">${isGuestUser ? '游客' : (person ? person.name + '兄弟' : (u.nickname || u.username || '用户'))}</span>
+                        ${isWechatLogin ? `<i class="fas fa-edit me-name-edit" onclick="app.editNickname()"></i>` : ''}
+                    </div>
+                    <span class="role-tag role-tag-${role}">${roleLabels[role]}</span>
+                </div>
+            </div>
+            <div class="me-info-grid">
+                ${u.li_shi_id ? `<div class="me-info-item"><span class="me-info-label">李氏号</span><span class="me-info-value">${u.li_shi_id}</span></div>` : ''}
+                ${person ? `<div class="me-info-item"><span class="me-info-label">绑定人物</span><span class="me-info-value">${person.name}${person.generation ? '(' + person.generation + ')' : ''}</span></div>` : ''}
+                ${person?.shi_xi ? `<div class="me-info-item"><span class="me-info-label">世系</span><span class="me-info-value">第${person.shi_xi}世</span></div>` : ''}
+                ${u.phone ? `<div class="me-info-item"><span class="me-info-label">手机号</span><span class="me-info-value">${maskPhone(u.phone)}</span></div>` : ''}
+            </div>
+        </div>
+
+        <!-- 公告滚动栏 -->
+        <div id="me-announcement-bar" class="announcement-bar hidden" onclick="app.navigateTo('announcement-board',{fromPage:'me'})">
+            <div class="ann-icon-wrap"><span class="ann-icon">📢</span></div>
+            <div class="ann-content-wrap"><div class="ann-scroll-area" id="me-ann-scroll-area"><span class="ann-text" id="me-ann-text"></span></div></div>
+        </div>
+
+        ${isGuestUser ? `
+        <!-- 游客隐私说明 -->
+        <div class="card me-status-card">
+            <div class="me-status-icon">🔒</div>
+            <div class="me-status-text">游客模式下，姓名和头像等隐私信息已脱敏处理</div>
+        </div>
+        <!-- 游客操作区 -->
+        <div class="card me-actions-card">
+            <button class="btn btn-block btn-outline me-action-btn" onclick="app.navigateTo('messages')"><i class="fas fa-envelope"></i> 给管理者留言</button>
+            <button class="btn btn-block btn-primary me-action-btn" onclick="app.showLoginPage()"><i class="fas fa-sign-in-alt"></i> 前往登录</button>
+            <button class="btn btn-block btn-outline me-action-btn" onclick="app.logout()"><i class="fas fa-sign-out-alt"></i> 退出游客模式</button>
+        </div>
+        ` : `
+        ${role === 'user' ? `
+        <!-- 未认证提示 -->
+        <div class="card me-status-card me-status-unverified">
+            <div class="me-status-icon">⚠️</div>
+            <div class="me-status-text">您尚未被认证为家族成员，部分功能受限。请联系管理员认证。</div>
+        </div>
+        ` : ''}
+        ${isVerified ? `
+        <!-- 已认证提示 -->
+        <div class="card me-status-card me-status-verified">
+            <div class="me-status-icon">✅</div>
+            <div class="me-status-text">您已认证为家族成员</div>
+        </div>
+        ` : ''}
+
+        <!-- 操作按钮区 -->
+        <div class="card me-actions-card">
+            <button class="btn btn-block btn-outline me-action-btn" onclick="app.navigateTo('messages')"><i class="fas fa-envelope"></i> 给管理者留言</button>
+            ${role === 'user' ? `<div class="me-hint-text">未认证用户暂无法绑定人物，请联系管理员认证。</div>` : ''}
+            ${isVerified && !personId ? `<button class="btn btn-block btn-primary me-action-btn" onclick="app.navigateTo('baota',{bind_mode:1})"><i class="fas fa-link"></i> 去绑定人物</button>` : ''}
+            ${isAdminRole ? `<button class="btn btn-block btn-outline me-action-btn" onclick="app.navigateTo('admin-accounts')"><i class="fas fa-user-shield"></i> 帐号管理</button>` : ''}
+            ${isWechatLogin ? `<button class="btn btn-block btn-outline me-action-btn" onclick="app.showBindPhoneModal()"><i class="fas fa-phone"></i> 添加/修改手机号</button>` : ''}
+            <button class="btn btn-block btn-outline me-action-btn" onclick="app.showChangePasswordModal()"><i class="fas fa-key"></i> 修改密码</button>
+            <button class="btn btn-block btn-outline me-action-btn me-logout-btn" onclick="app.logout()"><i class="fas fa-sign-out-alt"></i> 退出登录</button>
+        </div>
+        `}
+
+        <!-- 族谱说明 -->
+        <div class="card me-desc-card">
+            <h3><i class="fas fa-info-circle"></i> 族谱说明 ${isAdminRole ? '<button class="btn btn-small btn-outline" onclick="app.showEditDescModal()" style="float:right;">编辑</button>' : ''}</h3>
+            <div id="me-desc-content" class="me-desc-content">加载中...</div>
+        </div>
+
+        <!-- 关于程序 -->
+        <div class="card me-about-card">
+            <h3><i class="fas fa-code"></i> 关于程序</h3>
+            <div class="me-about-info">
+                <span>版本：V1.05</span>
+                <span>开发者：化州保叔</span>
+            </div>
+        </div>`;
+        // 加载族谱说明
+        this.loadGenealogyDesc();
+    }
+
+    async loadGenealogyDesc() {
+        try {
+            const res = await api.getGenealogyDesc();
+            const el = document.getElementById('me-desc-content');
+            if (el) el.textContent = (res.status === 'success' && res.data?.content) ? res.data.content : '暂无说明';
+        } catch (e) { /* 静默 */ }
+    }
+
+    // ═══ 弹窗 ═══
+    showChangePasswordModal() {
+        const isWechat = this.currentUser?.loginType === 'wechat';
+        const body = `
+            ${isWechat ? '<p style="color:var(--warning);font-size:13px;margin-bottom:12px;">⚠️ 微信登录用户设置密码后也可用密码登录</p>' : ''}
+            <div class="form-group"><label>新密码</label><input type="password" id="new-password" placeholder="请输入新密码（至少6位）"></div>
+            <div class="form-group"><label>确认密码</label><input type="password" id="confirm-password" placeholder="请再次输入新密码"></div>
+        `;
+        this.showDynamicModal('修改密码', body, () => this.doChangePassword());
+    }
+
+    async doChangePassword() {
+        const pwd = document.getElementById('new-password')?.value;
+        const confirmPwd = document.getElementById('confirm-password')?.value;
+        if (!pwd || pwd.length < 6) { showToast('密码至少6位', 'error'); return; }
+        if (pwd !== confirmPwd) { showToast('两次密码不一致', 'error'); return; }
+        showLoading();
+        try {
+            const res = await api.changePassword(pwd, this.currentUser?.username);
+            if (res.status === 'success') { showToast('密码修改成功', 'success'); this.closeDynamicModal(); }
+            else showToast(res.message || '修改失败', 'error');
+        } catch (e) { showToast('修改失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    showBindPhoneModal() {
+        const body = `<div class="form-group"><label>手机号</label><input type="tel" id="bind-phone-input" placeholder="请输入手机号（1开头11位）" maxlength="11"></div>`;
+        this.showDynamicModal('绑定手机号', body, () => this.doBindPhone());
+    }
+
+    async doBindPhone() {
+        const phone = document.getElementById('bind-phone-input')?.value?.trim();
+        if (!phone || !/^1\d{10}$/.test(phone)) { showToast('请输入正确的手机号', 'error'); return; }
+        showLoading();
+        try {
+            const res = await api.bindPhone(phone);
+            if (res.status === 'success') { showToast('手机号绑定成功', 'success'); this.currentUser.phone = phone; localStorage.setItem(USER_KEY, JSON.stringify(this.currentUser)); this.closeDynamicModal(); this.loadMe(); }
+            else showToast(res.message || '绑定失败', 'error');
+        } catch (e) { showToast('绑定失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    showEditDescModal() {
+        const current = document.getElementById('me-desc-content')?.textContent || '';
+        const body = `<div class="form-group"><label>族谱说明 <span id="desc-char-count">${current.length}/500</span></label><textarea id="desc-edit-input" maxlength="500" rows="6" oninput="document.getElementById('desc-char-count').textContent=this.value.length+'/500'">${current}</textarea></div>`;
+        this.showDynamicModal('编辑族谱说明', body, () => this.doEditDesc());
+    }
+
+    async doEditDesc() {
+        const content = document.getElementById('desc-edit-input')?.value?.trim();
+        if (!content) { showToast('内容不能为空', 'error'); return; }
+        showLoading();
+        try {
+            const res = await api.updateGenealogyDesc(content);
+            if (res.status === 'success') { showToast('保存成功', 'success'); this.closeDynamicModal(); this.loadGenealogyDesc(); }
+            else showToast(res.message || '保存失败', 'error');
+        } catch (e) { showToast('保存失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    async editAvatar() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            showLoading();
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('file_type', 'avatars');
+                const res = await api.uploadFile(formData);
+                if (res.status === 'success' && res.url) {
+                    await api.updateProfile({ avatar_url: res.url });
+                    this.currentUser.avatar_url = res.url;
+                    localStorage.setItem(USER_KEY, JSON.stringify(this.currentUser));
+                    showToast('头像更新成功', 'success');
+                    this.renderMe();
+                } else showToast(res.message || '上传失败', 'error');
+            } catch (e) { showToast('上传失败', 'error'); }
+            finally { hideLoading(); }
+        };
+        input.click();
+    }
+
+    editNickname() {
+        const current = this.currentUser?.nickname || '';
+        const newNickname = prompt('修改昵称：', current);
+        if (newNickname === null || newNickname === current) return;
+        showLoading();
+        api.updateProfile({ nickname: newNickname }).then(res => {
+            if (res.status === 'success') {
+                this.currentUser.nickname = newNickname;
+                localStorage.setItem(USER_KEY, JSON.stringify(this.currentUser));
+                showToast('昵称修改成功', 'success');
+                this.renderMe();
+            } else showToast(res.message || '修改失败', 'error');
+        }).catch(() => showToast('修改失败', 'error')).finally(() => hideLoading());
+    }
+
+    showDynamicModal(title, bodyHtml, onOk) {
+        const titleEl = document.getElementById('dynamic-modal-title');
+        const bodyEl = document.getElementById('dynamic-modal-body');
+        const footerEl = document.getElementById('dynamic-modal-footer');
+        if (titleEl) titleEl.textContent = title;
+        if (bodyEl) bodyEl.innerHTML = bodyHtml;
+        if (footerEl) footerEl.innerHTML = `<button class="btn" onclick="app.closeDynamicModal()">取消</button><button class="btn btn-primary" id="dynamic-modal-ok">确定</button>`;
+        const okBtn = document.getElementById('dynamic-modal-ok');
+        if (okBtn && onOk) okBtn.addEventListener('click', onOk);
+        this.showModal('dynamic-modal');
+    }
+
+    // ═══ 留言板 ═══
+    async loadMessages() {
+        showLoading();
+        try {
+            const res = await api.getMessages();
+            if (res.status === 'success') this.renderMessages(res.data || []);
+            this.loadAnnouncementsForPage('messages', 'msg-announcement-bar', 'msg-ann-scroll-area', 'msg-ann-text');
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    renderMessages(messages) {
+        const container = document.getElementById('messages-list');
+        if (!container) return;
+        const role = getCurrentRole();
+        const isAdminRole = isAdmin();
+        // 非管理员显示发布区
+        document.querySelector('.non-admin-area')?.classList.toggle('hidden', isAdminRole);
+
+        if (messages.length === 0) { container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px;">暂无留言</p>'; return; }
+        container.innerHTML = messages.map(m => {
+            const isRead = m.is_read === 1;
+            const images = m.image_urls ? (typeof m.image_urls === 'string' ? JSON.parse(m.image_urls) : m.image_urls) : [];
+            return `
+            <div class="msg-card">
+                <div class="msg-header">
+                    <span class="msg-user">${m.nickname || m.li_shi_id || m.guest_id || '匿名'}</span>
+                    <span class="msg-time">${timeAgo(m.created_at)}</span>
+                    ${isAdminRole ? `<span class="msg-read-tag ${isRead?'read':'unread'}">${isRead?'已读':'未读'}</span>` : ''}
+                </div>
+                <div class="msg-content">${m.content || ''}</div>
+                ${images.length > 0 ? `<div class="msg-images">${images.map(url => `<img src="${url}" onclick="window.open('${url}','_blank')" style="max-width:120px;max-height:120px;border-radius:8px;cursor:pointer;margin:4px;">`).join('')}</div>` : ''}
+                ${m.reply ? `<div class="msg-reply"><i class="fas

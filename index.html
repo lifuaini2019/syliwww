@@ -17,46 +17,53 @@
                     <h1>上院李十七世族谱</h1>
                     <p>家族传承 · 世代相传</p>
                 </div>
-                <!-- 登录Tab切换 -->
-                <div class="login-tabs">
-                    <button class="login-tab active" data-tab="wechat">
-                        <i class="fab fa-weixin"></i> 微信扫码
-                    </button>
-                    <button class="login-tab" data-tab="account">
-                        <i class="fas fa-user"></i> 账号密码
-                    </button>
-                </div>
-                <!-- 微信扫码登录区 -->
-                <div class="login-tab-content active" id="login-wechat">
-                    <div id="wechat-qr-container" class="wechat-qr-container">
-                        <div class="wechat-qr-wrap">
-                            <div class="wechat-qr-placeholder">
-                                <i class="fab fa-weixin wechat-icon-lg"></i>
-                                <p>点击下方按钮获取登录二维码</p>
-                            </div>
-                            <button class="btn btn-wechat" id="get-qr-btn">
-                                <i class="fab fa-weixin"></i> 获取微信登录二维码
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <!-- 账号密码登录区 -->
-                <div class="login-tab-content" id="login-account">
-                    <div class="login-form">
-                        <div class="form-group">
-                            <label><i class="fas fa-user"></i> 手机号/李氏号</label>
-                            <input type="text" id="login-username" placeholder="请输入手机号或李氏号">
-                        </div>
-                        <div class="form-group">
-                            <label><i class="fas fa-lock"></i> 密码</label>
-                            <input type="password" id="login-password" placeholder="请输入密码">
-                        </div>
-                        <button id="login-btn" class="btn btn-primary btn-block">
-                            <i class="fas fa-sign-in-alt"></i> 登录
+                <!-- 电脑端：左右分栏布局；手机端：Tab切换 -->
+                <div class="login-body">
+                    <!-- 手机端Tab切换 -->
+                    <div class="login-tabs mobile-only">
+                        <button class="login-tab active" data-tab="wechat">
+                            <i class="fab fa-weixin"></i> 微信登录
+                        </button>
+                        <button class="login-tab" data-tab="account">
+                            <i class="fas fa-user"></i> 账号登录
                         </button>
                     </div>
-                    <div class="login-hint">
-                        <small>初始密码为手机号后6位</small>
+                    <!-- 微信扫码登录区 -->
+                    <div class="login-tab-content active" id="login-wechat">
+                        <div id="wechat-qr-container" class="wechat-qr-container">
+                            <div class="wechat-qr-wrap">
+                                <div class="wechat-qr-placeholder">
+                                    <i class="fab fa-weixin wechat-icon-lg"></i>
+                                    <p>点击下方按钮获取登录二维码</p>
+                                </div>
+                                <button class="btn btn-wechat" id="get-qr-btn">
+                                    <i class="fab fa-weixin"></i> 获取微信登录二维码
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 分隔线（电脑端显示） -->
+                    <div class="login-divider desktop-only">
+                        <span>或</span>
+                    </div>
+                    <!-- 账号密码登录区 -->
+                    <div class="login-tab-content" id="login-account">
+                        <div class="login-form">
+                            <div class="form-group">
+                                <label><i class="fas fa-user"></i> 手机号/李氏号</label>
+                                <input type="text" id="login-username" placeholder="请输入手机号或李氏号">
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-lock"></i> 密码</label>
+                                <input type="password" id="login-password" placeholder="请输入密码">
+                            </div>
+                            <button id="login-btn" class="btn btn-primary btn-block">
+                                <i class="fas fa-sign-in-alt"></i> 登录
+                            </button>
+                        </div>
+                        <div class="login-hint">
+                            <small>初始密码为手机号后6位</small>
+                        </div>
                     </div>
                 </div>
                 <!-- 游客按钮 -->
@@ -77,17 +84,18 @@
                     <h1 class="header-title">上院李十七世族谱</h1>
                 </div>
                 <div class="header-right">
-                    <span id="user-info" class="header-user">
+                    <span id="user-info" class="header-user" onclick="app.onHeaderUserClick()">
                         <i class="fas fa-user"></i> <span id="username-display"></span>
                         <span id="role-display" class="role-tag-small"></span>
                     </span>
-                    <button id="logout-btn" class="btn btn-small btn-outline">
+                    <span id="li-shi-display" class="header-li-shi"></span>
+                    <button id="logout-btn" class="btn btn-small btn-outline" onclick="app.logout()">
                         <i class="fas fa-sign-out-alt"></i> <span class="hide-mobile">退出</span>
                     </button>
                 </div>
             </header>
 
-            <!-- 侧边导航栏（电脑端） -->
+            <!-- 侧边导航栏（电脑端+手机端抽屉） -->
             <nav id="sidebar" class="sidebar">
                 <div class="sidebar-header">
                     <h3>功能菜单</h3>
@@ -116,7 +124,7 @@
                         <i class="fas fa-envelope"></i><span>留言板</span>
                         <span id="sidebar-unread-badge" class="badge-danger hidden">0</span>
                     </li>
-                    <li class="menu-item" data-page="worship">
+                    <li class="menu-item worship-menu-item" data-page="worship">
                         <i class="fas fa-fire"></i><span>祭拜祖先</span>
                     </li>
                     <li class="menu-item admin-only hidden" data-page="admin-accounts">
@@ -127,6 +135,9 @@
                     </li>
                     <li class="menu-item super-admin-only hidden" data-page="worship-admin">
                         <i class="fas fa-cog"></i><span>祭拜设置</span>
+                    </li>
+                    <li class="menu-item" data-page="announcement-board">
+                        <i class="fas fa-clipboard-list"></i><span>公告板</span>
                     </li>
                     <li class="menu-item" data-page="me">
                         <i class="fas fa-id-card"></i><span>我的</span>
@@ -144,13 +155,13 @@
                     <!-- 统计卡片 -->
                     <div class="stats-grid">
                         <div class="stat-card"><div class="stat-icon blue"><i class="fas fa-users"></i></div><div class="stat-info"><div class="stat-value" id="stat-total">0</div><div class="stat-label">总人数</div></div></div>
-                        <div class="stat-card"><div class="stat-icon green"><i class="fas fa-male"></i></div><div class="stat-info"><div class="stat-value" id="stat-male">0</div><div class="stat-label">男性</div></div></div>
+                        <div class="stat-card clickable" onclick="app.navigateTo('people',{filterMale:1})"><div class="stat-icon green"><i class="fas fa-male"></i></div><div class="stat-info"><div class="stat-value" id="stat-male">0</div><div class="stat-label">男性</div><div class="stat-tap">点击查看 ›</div></div></div>
                         <div class="stat-card clickable" onclick="app.navigateTo('people',{filterFemale:1})"><div class="stat-icon pink"><i class="fas fa-female"></i></div><div class="stat-info"><div class="stat-value" id="stat-female">0</div><div class="stat-label">女儿</div><div class="stat-tap">点击查看 ›</div></div></div>
                         <div class="stat-card"><div class="stat-icon orange"><i class="fas fa-layer-group"></i></div><div class="stat-info"><div class="stat-value" id="stat-gen">0</div><div class="stat-label">世代数</div></div></div>
                     </div>
 
                     <!-- 公告栏 -->
-                    <div id="announcement-bar" class="announcement-bar hidden">
+                    <div id="announcement-bar" class="announcement-bar hidden" onclick="app.navigateTo('announcement-board',{fromPage:'index'})">
                         <div class="ann-icon-wrap"><span class="ann-icon">📢</span></div>
                         <div class="ann-content-wrap">
                             <div class="ann-scroll-area" id="ann-scroll-area">
@@ -176,11 +187,12 @@
                         <div class="home-menu-item" onclick="app.navigateTo('baota')"><div class="menu-icon baota"><span>🏛️</span></div><span class="menu-text">宝塔树</span></div>
                         <div class="home-menu-item" onclick="app.navigateTo('generation-names')"><div class="menu-icon gen"><span>📖</span></div><span class="menu-text">字辈列表</span></div>
                         <div class="home-menu-item" onclick="app.navigateTo('messages')"><div class="menu-icon msg"><span>✉️</span></div><span class="menu-text">我要留言</span></div>
-                        <div class="home-menu-item" onclick="app.navigateTo('worship')"><div class="menu-icon worship"><span>🕯️</span></div><span class="menu-text">祭拜祖先</span></div>
+                        <div class="home-menu-item worship-menu-home" onclick="app.navigateTo('worship')"><div class="menu-icon worship"><span>🕯️</span></div><span class="menu-text">祭拜祖先</span></div>
                         <div class="home-menu-item admin-only hidden" onclick="app.navigateTo('admin-accounts')"><div class="menu-icon admin"><span>📋</span></div><span class="menu-text">帐号管理</span></div>
                         <div class="home-menu-item admin-only hidden" onclick="app.navigateTo('messages')"><div class="menu-icon msg-admin"><span>✉️</span><span class="badge-danger" id="home-unread-badge" style="display:none">0</span></div><span class="menu-text">留言信箱</span></div>
                         <div class="home-menu-item admin-only hidden" onclick="app.navigateTo('announcement-manage')"><div class="menu-icon ann"><span>📢</span></div><span class="menu-text">公告管理</span></div>
                         <div class="home-menu-item super-admin-only hidden" onclick="app.navigateTo('worship-admin')"><div class="menu-icon worship-set"><span>⚙️</span></div><span class="menu-text">祭拜设置</span></div>
+                        <div class="home-menu-item" onclick="app.navigateTo('announcement-board',{fromPage:'index'})"><div class="menu-icon ann-board"><span>📋</span></div><span class="menu-text">公告板</span></div>
                     </div>
 
                     <!-- 17世后统计 -->
@@ -210,22 +222,21 @@
                 <!-- ═══ 人员列表 ═══ -->
                 <div id="people-section" class="content-section hidden">
                     <div class="section-toolbar">
-                        <div class="search-box"><i class="fas fa-search"></i><input type="text" id="people-search" placeholder="搜索姓名、手机号..."></div>
-                        <div class="toolbar-actions">
-                            <select id="people-filter" class="filter-select">
-                                <option value="">全部</option>
-                                <option value="alive">健在</option>
-                                <option value="deceased">去世</option>
-                                <option value="married">已婚</option>
-                                <option value="unmarried">未婚</option>
-                                <option value="male">仅男丁</option>
-                                <option value="female">仅女儿</option>
-                                <option value="spouse">仅配偶</option>
-                            </select>
-                            <button id="add-person-btn" class="btn btn-primary admin-only hidden"><i class="fas fa-plus"></i> 添加</button>
-                        </div>
+                        <div class="search-box"><i class="fas fa-search"></i><input type="text" id="people-search" placeholder="搜索姓名、别名、字辈..."></div>
+                    </div>
+                    <!-- 公告栏 -->
+                    <div id="people-announcement-bar" class="announcement-bar hidden" onclick="app.navigateTo('announcement-board',{fromPage:'people'})">
+                        <div class="ann-icon-wrap"><span class="ann-icon">📢</span></div>
+                        <div class="ann-content-wrap"><div class="ann-scroll-area" id="people-ann-scroll-area"><span class="ann-text" id="people-ann-text"></span></div></div>
                     </div>
                     <div class="people-list" id="people-list"></div>
+                    <!-- 底部筛选操作栏 -->
+                    <div class="bottom-filter-bar" id="people-filter-bar">
+                        <button class="filter-toggle-btn" id="filter-dead-toggle" onclick="app.togglePeopleFilter('hideDead')">隐藏已故</button>
+                        <button class="filter-toggle-btn" id="filter-female-toggle" onclick="app.togglePeopleFilter('hideFemale')">隐藏女性</button>
+                        <button class="filter-toggle-btn" id="filter-before17-toggle" onclick="app.togglePeopleFilter('onlyAfter17')">只显17世后</button>
+                        <button class="filter-toggle-btn admin-only hidden" id="add-person-btn" onclick="app.openAddPersonModal()"><i class="fas fa-plus"></i> 添加</button>
+                    </div>
                 </div>
 
                 <!-- ═══ 人员详情 ═══ -->
@@ -241,6 +252,7 @@
                 <!-- ═══ 世系图 ═══ -->
                 <div id="tree-section" class="content-section hidden">
                     <div class="view-toolbar">
+                        <div class="search-box search-box-sm"><i class="fas fa-search"></i><input type="text" id="tree-search" placeholder="搜索姓名/字辈..."></div>
                         <div class="zoom-controls">
                             <button class="btn btn-small" id="tree-zoom-out" title="缩小"><i class="fas fa-search-minus"></i></button>
                             <span id="tree-zoom-level">100%</span>
@@ -259,9 +271,12 @@
                             <div class="side-panel-header"><h4><i class="fas fa-user"></i> 已选：<span id="selected-name">-</span></h4><button class="btn btn-small btn-close-panel" id="close-tree-panel"><i class="fas fa-times"></i></button></div>
                             <div class="selected-info" id="selected-info"></div>
                             <div class="action-buttons">
+                                <button class="btn btn-action" id="btn-add-father" disabled><i class="fas fa-arrow-up"></i> 添加父亲</button>
                                 <button class="btn btn-action" id="btn-add-son" disabled><i class="fas fa-child"></i> 添加儿子</button>
                                 <button class="btn btn-action" id="btn-add-spouse" disabled><i class="fas fa-heart"></i> 添加配偶</button>
+                                <button class="btn btn-action" id="btn-add-sibling" disabled><i class="fas fa-arrows-alt-h"></i> 添加兄弟</button>
                                 <button class="btn btn-action btn-edit" id="btn-edit-person" disabled><i class="fas fa-edit"></i> 编辑</button>
+                                <button class="btn btn-action btn-view" id="btn-view-person" disabled><i class="fas fa-eye"></i> 查看详情</button>
                             </div>
                         </div>
                     </div>
@@ -270,6 +285,7 @@
                 <!-- ═══ 宝塔树 ═══ -->
                 <div id="baota-section" class="content-section hidden">
                     <div class="view-toolbar">
+                        <div class="search-box search-box-sm"><i class="fas fa-search"></i><input type="text" id="baota-search" placeholder="搜索姓名/字辈..."></div>
                         <div class="zoom-controls">
                             <button class="btn btn-small" id="baota-zoom-out" title="缩小"><i class="fas fa-search-minus"></i></button>
                             <span id="baota-zoom-level">100%</span>
@@ -288,6 +304,7 @@
                                 <button class="btn btn-action" id="baota-btn-add-son" disabled><i class="fas fa-child"></i> 添加儿子</button>
                                 <button class="btn btn-action" id="baota-btn-add-spouse" disabled><i class="fas fa-heart"></i> 添加配偶</button>
                                 <button class="btn btn-action btn-edit" id="baota-btn-edit-person" disabled><i class="fas fa-edit"></i> 编辑</button>
+                                <button class="btn btn-action btn-view" id="baota-btn-view-person" disabled><i class="fas fa-eye"></i> 查看详情</button>
                                 <button class="btn btn-action btn-bind hidden" id="baota-btn-bind-person" disabled><i class="fas fa-link"></i> 绑定此人物</button>
                             </div>
                         </div>
@@ -297,6 +314,11 @@
                 <!-- ═══ 字辈列表 ═══ -->
                 <div id="generation-names-section" class="content-section hidden">
                     <div class="section-toolbar"><h3><i class="fas fa-book"></i> 字辈列表</h3></div>
+                    <!-- 公告栏 -->
+                    <div id="gen-names-announcement-bar" class="announcement-bar hidden" onclick="app.navigateTo('announcement-board',{fromPage:'generation-names'})">
+                        <div class="ann-icon-wrap"><span class="ann-icon">📢</span></div>
+                        <div class="ann-content-wrap"><div class="ann-scroll-area" id="gen-names-ann-scroll-area"><span class="ann-text" id="gen-names-ann-text"></span></div></div>
+                    </div>
                     <div id="generation-names-list" class="gen-names-list"></div>
                 </div>
 
@@ -313,7 +335,7 @@
                         <button class="btn btn-small btn-danger admin-only hidden" id="msg-clear-all-btn">清空全部</button>
                     </div>
                     <!-- 公告栏 -->
-                    <div id="msg-announcement-bar" class="announcement-bar hidden">
+                    <div id="msg-announcement-bar" class="announcement-bar hidden" onclick="app.navigateTo('announcement-board',{fromPage:'messages'})">
                         <div class="ann-icon-wrap"><span class="ann-icon">📢</span></div>
                         <div class="ann-content-wrap"><div class="ann-scroll-area" id="msg-ann-scroll-area"><span class="ann-text" id="msg-ann-text"></span></div></div>
                     </div>
@@ -321,8 +343,15 @@
                     <div class="msg-compose non-admin-area">
                         <textarea id="msg-compose-input" class="msg-compose-input" placeholder="写下你的留言..." maxlength="500"></textarea>
                         <div class="msg-compose-footer">
-                            <span class="char-count" id="msg-char-count">0/500</span>
-                            <button class="btn btn-primary btn-small" id="msg-submit-btn">发布留言</button>
+                            <div class="msg-img-upload">
+                                <button class="btn btn-small btn-outline" id="msg-img-btn"><i class="fas fa-image"></i> 图片</button>
+                                <input type="file" id="msg-img-input" accept="image/*" multiple style="display:none">
+                                <div id="msg-img-preview" class="msg-img-preview"></div>
+                            </div>
+                            <div class="msg-compose-right">
+                                <span class="char-count" id="msg-char-count">0/500</span>
+                                <button class="btn btn-primary btn-small" id="msg-submit-btn">发布留言</button>
+                            </div>
                         </div>
                     </div>
                     <!-- 留言列表 -->
@@ -338,14 +367,29 @@
                     <div id="announcement-manage-list"></div>
                 </div>
 
+                <!-- ═══ 公告板 ═══ -->
+                <div id="announcement-board-section" class="content-section hidden">
+                    <div class="section-toolbar"><h3><i class="fas fa-clipboard-list"></i> 公告板</h3></div>
+                    <div id="announcement-board-content"></div>
+                </div>
+
                 <!-- ═══ 帐号管理 ═══ -->
                 <div id="admin-accounts-section" class="content-section hidden">
                     <div class="section-toolbar">
                         <h3><i class="fas fa-user-shield"></i> 帐号管理</h3>
                         <div class="admin-batch-actions">
                             <button class="btn btn-small btn-outline" id="batch-verify-btn" disabled>批量认证</button>
+                            <button class="btn btn-small btn-outline" id="batch-role-btn" disabled>改角色</button>
                             <button class="btn btn-small btn-danger" id="batch-delete-btn" disabled>批量删除</button>
                         </div>
+                    </div>
+                    <!-- 筛选Tab -->
+                    <div class="admin-filter-tabs" id="admin-filter-tabs">
+                        <button class="admin-tab active" data-filter="all">全部</button>
+                        <button class="admin-tab" data-filter="unverified">未认证</button>
+                        <button class="admin-tab" data-filter="verified">已认证</button>
+                        <button class="admin-tab" data-filter="admin">管理员</button>
+                        <button class="admin-tab" data-filter="login_sort">🕐登录排序</button>
                     </div>
                     <div class="search-box" style="margin-bottom:12px"><i class="fas fa-search"></i><input type="text" id="admin-search" placeholder="搜索昵称/李氏号/手机号..."></div>
                     <div id="admin-accounts-list" class="admin-accounts-list"></div>
@@ -365,7 +409,16 @@
                         <button class="filter-btn" data-shixi="3">3世</button>
                         <button class="filter-btn" data-shixi="4">4世</button>
                     </div>
+                    <div class="worship-sort-bar">
+                        <button class="sort-btn active" data-sort="default">默认排序</button>
+                        <button class="sort-btn" data-sort="shi_xi">按世代</button>
+                        <button class="sort-btn" data-sort="incense">按受香次数</button>
+                    </div>
                     <div id="worship-ancestors-list" class="worship-ancestors-list"></div>
+                    <div class="worship-bottom-links">
+                        <button class="btn btn-small btn-outline" onclick="app.navigateTo('worship-live-rank')">📊 上香排行</button>
+                        <button class="btn btn-small btn-outline" onclick="app.navigateTo('worship-merit-rank')">🏆 功德排行</button>
+                    </div>
                 </div>
 
                 <!-- ═══ 祭拜神台 ═══ -->
@@ -377,6 +430,18 @@
                 <div id="worship-admin-section" class="content-section hidden">
                     <div class="section-toolbar"><h3><i class="fas fa-cog"></i> 祭拜设置</h3></div>
                     <div id="worship-admin-content"></div>
+                </div>
+
+                <!-- ═══ 祭拜实时排行 ═══ -->
+                <div id="worship-live-rank-section" class="content-section hidden">
+                    <div class="section-toolbar"><h3><i class="fas fa-chart-line"></i> 上香排行</h3></div>
+                    <div id="worship-live-rank-content"></div>
+                </div>
+
+                <!-- ═══ 祭拜功德排行 ═══ -->
+                <div id="worship-merit-rank-section" class="content-section hidden">
+                    <div class="section-toolbar"><h3><i class="fas fa-trophy"></i> 功德排行</h3></div>
+                    <div id="worship-merit-rank-content"></div>
                 </div>
 
                 <!-- ═══ 我的页面 ═══ -->
@@ -402,6 +467,15 @@
                 <div class="modal-header"><h3 id="confirm-title">确认操作</h3><button class="modal-close">&times;</button></div>
                 <div class="modal-body"><p id="confirm-message"></p></div>
                 <div class="modal-footer"><button class="btn" id="confirm-cancel">取消</button><button class="btn btn-danger" id="confirm-ok">确定</button></div>
+            </div>
+        </div>
+
+        <!-- 通用Modal容器（动态内容） -->
+        <div id="dynamic-modal" class="modal hidden">
+            <div class="modal-content" id="dynamic-modal-content">
+                <div class="modal-header"><h3 id="dynamic-modal-title">操作</h3><button class="modal-close" onclick="app.closeDynamicModal()">&times;</button></div>
+                <div class="modal-body" id="dynamic-modal-body"></div>
+                <div class="modal-footer" id="dynamic-modal-footer"></div>
             </div>
         </div>
 
