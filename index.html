@@ -95,12 +95,13 @@
                 </div>
             </header>
 
-            <!-- 侧边导航栏（电脑端+手机端抽屉） -->
+            <!-- 侧边导航栏（电脑端固定+手机端抽屉） -->
             <nav id="sidebar" class="sidebar">
                 <div class="sidebar-header">
-                    <h3>功能菜单</h3>
-                    <button id="sidebar-close" class="sidebar-close"><i class="fas fa-times"></i></button>
+                    <h3>上院李族谱</h3>
+                    <button id="sidebar-close" class="sidebar-close mobile-only"><i class="fas fa-times"></i></button>
                 </div>
+                <div class="sidebar-user-info" id="sidebar-user-info"></div>
                 <ul class="menu-list">
                     <li class="menu-item active" data-page="home">
                         <i class="fas fa-home"></i><span>族谱首页</span>
@@ -251,6 +252,11 @@
 
                 <!-- ═══ 世系图 ═══ -->
                 <div id="tree-section" class="content-section hidden">
+                    <!-- 公告栏 -->
+                    <div id="tree-announcement-bar" class="announcement-bar hidden" onclick="app.navigateTo('announcement-board',{fromPage:'tree'})">
+                        <div class="ann-icon-wrap"><span class="ann-icon">📢</span></div>
+                        <div class="ann-content-wrap"><div class="ann-scroll-area" id="tree-ann-scroll-area"><span class="ann-text" id="tree-ann-text"></span></div></div>
+                    </div>
                     <div class="view-toolbar">
                         <div class="search-box search-box-sm"><i class="fas fa-search"></i><input type="text" id="tree-search" placeholder="搜索姓名/字辈..."></div>
                         <div class="zoom-controls">
@@ -263,6 +269,7 @@
                             <button class="btn btn-small active" id="tree-mode-vertical"><i class="fas fa-arrows-alt-v"></i> 纵向</button>
                             <button class="btn btn-small" id="tree-mode-horizontal"><i class="fas fa-arrows-alt-h"></i> 横向</button>
                         </div>
+                        <button class="btn btn-small btn-outline" id="tree-expand-all" title="全部展开/收起"><i class="fas fa-expand-alt"></i> 展开/收起</button>
                         <div class="tree-hint">提示：Ctrl+滚轮缩放，拖拽移动视图</div>
                     </div>
                     <div class="tree-layout">
@@ -429,6 +436,11 @@
                 <!-- ═══ 祭拜设置（超管） ═══ -->
                 <div id="worship-admin-section" class="content-section hidden">
                     <div class="section-toolbar"><h3><i class="fas fa-cog"></i> 祭拜设置</h3></div>
+                    <!-- 公告栏 -->
+                    <div id="worship-admin-announcement-bar" class="announcement-bar hidden" onclick="app.navigateTo('announcement-board',{fromPage:'worship'})">
+                        <div class="ann-icon-wrap"><span class="ann-icon">📢</span></div>
+                        <div class="ann-content-wrap"><div class="ann-scroll-area" id="worship-admin-ann-scroll-area"><span class="ann-text" id="worship-admin-ann-text"></span></div></div>
+                    </div>
                     <div id="worship-admin-content"></div>
                 </div>
 

@@ -35,7 +35,33 @@ class ZupuApp {
         this.init();
     }
 
-    init() { this.bindEvents(); this.checkLogin(); }
+    init() { this.bindEvents(); this.checkLogin(); this._initLazyLoad(); }
+
+    /** 图片懒加载初始化 */
+    _initLazyLoad() {
+        if (!('IntersectionObserver' in window)) return;
+        this._lazyObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    if (img.dataset.src) {
+                        img.src = img.dataset.src;
+                        img.removeAttribute('data-src');
+                        img.classList.add('lazy-loaded');
+                    }
+                    this._lazyObserver.unobserve(img);
+                }
+            });
+        }, { rootMargin: '200px' });
+    }
+
+    /** 观察懒加载图片 */
+    _observeLazyImages() {
+        if (!this._lazyObserver) return;
+        document.querySelectorAll('img[data-src]').forEach(img => {
+            this._lazyObserver.observe(img);
+        });
+    }
 
     bindEvents() {
         const $ = id => document.getElementById(id);
@@ -70,6 +96,7 @@ class ZupuApp {
         $('tree-reset')?.addEventListener('click', () => this.resetTreeZoom());
         $('tree-mode-vertical')?.addEventListener('click', () => this.setTreeMode('vertical'));
         $('tree-mode-horizontal')?.addEventListener('click', () => this.setTreeMode('horizontal'));
+        $('tree-expand-all')?.addEventListener('click', () => this.toggleExpandAll());
         $('close-tree-panel')?.addEventListener('click', () => this.closeTreePanel());
         $('btn-add-father')?.addEventListener('click', () => this.addRelative('father'));
         $('btn-add-son')?.addEventListener('click', () => this.addRelative('son'));
@@ -77,6 +104,7 @@ class ZupuApp {
         $('btn-add-sibling')?.addEventListener('click', () => this.addRelative('sibling'));
         $('btn-edit-person')?.addEventListener('click', () => this.editSelectedTreePerson());
         $('btn-view-person')?.addEventListener('click', () => this.viewSelectedTreePerson());
+        $('tree-search')?.addEventListener('input', e => this.treeSearch(e.target.value));
         // 宝塔树
         $('baota-zoom-in')?.addEventListener('click', () => this.zoomBaota(10));
         $('baota-zoom-out')?.addEventListener('click', () => this.zoomBaota(-10));
@@ -88,6 +116,7 @@ class ZupuApp {
         $('baota-btn-edit-person')?.addEventListener('click', () => this.editSelectedBaotaPerson());
         $('baota-btn-view-person')?.addEventListener('click', () => this.viewSelectedBaotaPerson());
         $('baota-btn-bind-person')?.addEventListener('click', () => this.bindSelectedBaotaPerson());
+        $('baota-search')?.addEventListener('input', e => { this._baotaState.searchKeyword = e.target.value; this.renderBaota(); if (e.target.value) { setTimeout(() => { const first = document.querySelector('.baota-node-highlight'); if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100); } });
         // 留言
         $('msg-compose-input')?.addEventListener('input', e => { $('msg-char-count').textContent = `${e.target.value.length}/500`; });
         $('msg-submit-btn')?.addEventListener('click', () => this.submitMessage());
@@ -301,6 +330,16 @@ class ZupuApp {
         if (messagesTitle) messagesTitle.textContent = isAdminRole ? '管理留言' : '给管理者留言';
         const addBtn = document.getElementById('add-person-btn');
         if (addBtn) addBtn.classList.toggle('hidden', !isAdminRole);
+
+        // 更新侧边栏用户信息
+        const sidebarUserInfo = document.getElementById('sidebar-user-info');
+        if (sidebarUserInfo) {
+            const avatarInitial = (displayName || '游')[0];
+            const avatarHtml = this.currentUser?.avatar_url && !isGuestUser
+                ? `<div class="sidebar-avatar"><img src="${this.currentUser.avatar_url}"></div>`
+                : `<div class="sidebar-avatar">${avatarInitial}</div>`;
+            sidebarUserInfo.innerHTML = `${avatarHtml}<div><div class="sidebar-user-name">${displayName}</div><div class="sidebar-user-role"><span class="role-tag-small role-tag-${role}">${this.getRoleLabel(role)}</span>${this.currentUser.li_shi_id ? ` · 李氏号:${this.currentUser.li_shi_id}` : ''}</div></div>`;
+        }
     }
 
     getDisplayName() {
@@ -313,13 +352,23 @@ class ZupuApp {
 
     // ═══ 导航 ═══
     navigateTo(page, params = {}) {
-        this.closeSidebar();
+        // 手机端：关闭抽屉侧边栏
+        if (window.innerWidth < 768) this.closeSidebar();
+        // ★ 离开实时排行页时停止定时器
+        if (page !== 'worship-live-rank') this.stopLiveRankTimer();
+        // 更新侧边栏/Tab的active状态
         document.querySelectorAll('.menu-item').forEach(item => item.classList.toggle('active', item.dataset.page === page));
         document.querySelectorAll('.tab-item').forEach(tab => tab.classList.toggle('active', tab.dataset.page === page));
         document.querySelectorAll('.content-section').forEach(section => section.classList.add('hidden'));
         const targetSection = document.getElementById(`${page}-section`);
         if (targetSection) targetSection.classList.remove('hidden');
         this._navParams = params;
+
+        // ★ 电脑端侧边栏滚动到当前active项
+        if (window.innerWidth >= 768) {
+            const activeItem = document.querySelector('.menu-item.active');
+            if (activeItem) activeItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
 
         // 根据页面加载对应数据
         const loaders = {
@@ -328,6 +377,7 @@ class ZupuApp {
             'gen-stats': () => this.loadGenStats(), messages: () => this.loadMessages(),
             'announcement-manage': () => this.loadAnnouncementManage(), 'announcement-board': () => this.loadAnnouncementBoard(),
             'admin-accounts': () => this.loadAdminAccounts(), worship: () => this.loadWorship(),
+            'worship-altar': () => this.loadWorshipAltar(params),
             'worship-admin': () => this.loadWorshipAdmin(), 'worship-live-rank': () => this.loadWorshipLiveRank(),
             'worship-merit-rank': () => this.loadWorshipMeritRank(), me: () => this.loadMe(),
             'person-detail': () => { if (params.id) this.loadPersonDetail(params.id); },
@@ -562,6 +612,8 @@ class ZupuApp {
                 </div>
             </div>`;
         }).join('');
+        // 触发懒加载
+        this._observeLazyImages();
     }
 
     // ═══ 人员详情 ═══
@@ -627,6 +679,10 @@ class ZupuApp {
             <div class="detail-item"><div class="detail-item-label">配偶</div><div class="detail-item-value">${p.spouse_person?`<a href="javascript:app.navigateTo('person-detail',{id:${p.spouse_person.id}})">${maskName(p.spouse_person.name,role)}</a>`:(maskName(p.spouse_name,role)||'-')}</div></div>
             ${p.spouse_person?`<div class="detail-item"><div class="detail-item-label">配偶生日</div><div class="detail-item-value">${p.spouse_person.birth_date||'-'}</div></div>
             <div class="detail-item"><div class="detail-item-label">配偶状态</div><div class="detail-item-value">${this.isAlive(p.spouse_person)?'健在':'已逝'}</div></div>`:''}
+        </div></div>`:''}
+        ${p.wx_nickname||p.bound_wx_nickname?`
+        <div class="card"><h3><i class="fab fa-weixin" style="color:#07c160;"></i> 已绑定微信</h3><div class="detail-grid">
+            <div class="detail-item"><div class="detail-item-label">微信昵称</div><div class="detail-item-value">${p.wx_nickname||p.bound_wx_nickname||'-'}</div></div>
         </div></div>`:''}
         ${children.length>0?`
         <div class="card"><h3><i class="fas fa-users"></i> 子女 (${children.length}人)</h3>
@@ -1628,28 +1684,54 @@ class ZupuApp {
             <div class="gen-name-card">
                 <div class="gen-name-header">
                     <span class="gen-name-shi">第${g.shi_xi}世</span>
-                    <span class="gen-name-value">${g.display_name || g.name || '未设置'}</span>
+                    <span class="gen-name-value ${g.is_unified === 0 && g.name ? 'gen-name-ununified' : ''}">${g.display_name || g.name || '未设置'}</span>
                     <span class="gen-name-count">${g.people_count || 0}人</span>
                     ${g.is_unified === 0 && g.name ? '<span class="gen-name-warning">⚠️ 未统一</span>' : ''}
-                    ${isAdmin() ? `<button class="btn btn-small btn-outline" onclick="app.editGenerationName(${g.shi_xi},'${g.name||''}')">修改</button>` : ''}
+                    ${isAdmin() ? `<div class="gen-name-actions">
+                        <button class="btn btn-small btn-outline" onclick="app.editGenerationName(${g.shi_xi},'${(g.name||'').replace(/'/g,"\\'")}',${g.people_count||0},${g.is_unified})">修改</button>
+                        ${g.name ? `<button class="btn btn-small btn-danger" onclick="app.clearGenerationName(${g.shi_xi})">清空</button>` : ''}
+                    </div>` : ''}
                 </div>
             </div>
         `).join('');
     }
 
-    async editGenerationName(shiXi, currentName) {
-        const newName = prompt(`修改第${shiXi}世字辈：`, currentName);
-        if (newName === null) return;
+    editGenerationName(shiXi, currentName, peopleCount, isUnified) {
+        const body = `
+            <div style="margin-bottom:12px;">
+                <div style="font-size:14px;color:var(--text-secondary);margin-bottom:4px;">第${shiXi}世 · ${peopleCount || 0}人 ${isUnified === 0 && currentName ? '<span style="color:var(--warning);">⚠️ 未统一</span>' : '<span style="color:var(--success);">✅ 已统一</span>'}</div>
+            </div>
+            <div class="form-group"><label>字辈名称</label><input type="text" id="gen-name-input" value="${currentName || ''}" placeholder="请输入字辈" maxlength="10"></div>
+        `;
+        this.showDynamicModal(`修改第${shiXi}世字辈`, body, () => this._doEditGenerationName(shiXi));
+    }
+
+    async _doEditGenerationName(shiXi) {
+        const newName = document.getElementById('gen-name-input')?.value?.trim() || '';
         showLoading();
         try {
             const res = await api.updateGenerationName(shiXi, newName);
-            if (res.status === 'success') { showToast(`已同步${res.synced || 0}人`, 'success'); this.loadGenerationNames(); }
+            if (res.status === 'success') { showToast(`已同步${res.synced || 0}人`, 'success'); this.closeDynamicModal(); this.loadGenerationNames(); }
             else showToast(res.message || '修改失败', 'error');
         } catch (e) { showToast('修改失败', 'error'); }
         finally { hideLoading(); }
     }
 
+    async clearGenerationName(shiXi) {
+        this.showConfirm('清空字辈', `确定清空第${shiXi}世的字辈吗？`, async () => {
+            showLoading();
+            try {
+                const res = await api.updateGenerationName(shiXi, '');
+                if (res.status === 'success') { showToast(`已清空，已同步${res.synced || 0}人`, 'success'); this.loadGenerationNames(); }
+                else showToast(res.message || '清空失败', 'error');
+            } catch (e) { showToast('清空失败', 'error'); }
+            finally { hideLoading(); }
+        });
+    }
+
     // ═══ 各世统计 ═══
+    _genStatsState = { showBefore17: true, showDeceased: true, filterMode: 'total' };
+
     async loadGenStats() {
         showLoading();
         try {
@@ -1665,33 +1747,73 @@ class ZupuApp {
     renderGenStats() {
         const container = document.getElementById('gen-stats-content');
         if (!container) return;
+        const st = this._genStatsState;
         const nonSp = this.peopleData.filter(p => !this.isSpouse(p));
         const gens = {};
         nonSp.forEach(p => {
-            const g = p.shi_xi || '未知';
+            const rawSx = p.shi_xi;
+            const sx = (rawSx != null && rawSx !== '') ? parseInt(String(rawSx)) : 0;
+            const g = isNaN(sx) ? 0 : sx;
+            if (g <= 0) return;
             if (!gens[g]) gens[g] = { count: 0, maleCount: 0, aliveCount: 0, aliveMaleCount: 0 };
             gens[g].count++;
             if (p.gender === '男') gens[g].maleCount++;
             if (this.isAlive(p)) { gens[g].aliveCount++; if (p.gender === '男') gens[g].aliveMaleCount++; }
         });
-        const sorted = Object.keys(gens).sort((a, b) => parseInt(a) - parseInt(b));
-        const totalPeople = nonSp.length;
-        const totalMale = nonSp.filter(p => p.gender === '男').length;
+        let sorted = Object.keys(gens).map(Number).sort((a, b) => a - b);
+        // ★ 筛选17世前
+        let filteredGens = st.showBefore17 ? sorted : sorted.filter(g => g >= 17);
+        const isMale = st.filterMode === 'male';
+        const hideDeceased = !st.showDeceased;
+        // ★ 可见人数
+        const visibleTotal = filteredGens.reduce((sum, g) => {
+            if (hideDeceased) return sum + (isMale ? gens[g].aliveMaleCount : gens[g].aliveCount);
+            return sum + (isMale ? gens[g].maleCount : gens[g].count);
+        }, 0);
+        const totalMale = sorted.reduce((s, g) => s + gens[g].maleCount, 0);
+
         container.innerHTML = `
+        <div class="gen-stats-controls">
+            <button class="filter-toggle-btn ${!st.showBefore17 ? 'active' : ''}" onclick="app.toggleGenStatsFilter('showBefore17')">${st.showBefore17 ? '🔒 隐藏17世前' : '🔓 显示17世前'}</button>
+            <button class="filter-toggle-btn ${!st.showDeceased ? 'active' : ''}" onclick="app.toggleGenStatsFilter('showDeceased')">${st.showDeceased ? '💀 隐已故' : '👥 显全部'}</button>
+            <button class="filter-toggle-btn ${isMale ? 'active' : ''}" onclick="app.toggleGenStatsFilter('filterMode')">${isMale ? '👨 男丁模式' : '👥 总人数'}</button>
+        </div>
         <div class="gen-stats-overview">
-            <div class="gen-overview-card"><span class="gen-overview-num">${totalPeople}</span><span class="gen-overview-label">总人数</span></div>
-            <div class="gen-overview-card"><span class="gen-overview-num">${totalMale}</span><span class="gen-overview-label">男丁数</span></div>
-            <div class="gen-overview-card"><span class="gen-overview-num">${sorted.length}</span><span class="gen-overview-label">世代数</span></div>
+            <div class="gen-overview-card clickable" onclick="app.onGenStatsOverviewClick()">
+                <span class="gen-overview-num">${isMale ? filteredGens.reduce((s,g)=>s+(hideDeceased?gens[g].aliveMaleCount:gens[g].maleCount),0) : visibleTotal}</span>
+                <span class="gen-overview-label">${isMale ? '男丁数' : '总人数'}</span>
+            </div>
+            <div class="gen-overview-card"><span class="gen-overview-num">${filteredGens.length}</span><span class="gen-overview-label">世代数</span></div>
+            <div class="gen-overview-card"><span class="gen-overview-num">${visibleTotal}</span><span class="gen-overview-label">可见人数</span></div>
         </div>
         <div class="gen-stats-grid">
-            ${sorted.map(g => `
-            <div class="gen-stat-card" onclick="app.navigateTo('people',{filterShiXi:${g}})">
+            ${filteredGens.map(g => {
+                const num = hideDeceased ? (isMale ? gens[g].aliveMaleCount : gens[g].aliveCount) : (isMale ? gens[g].maleCount : gens[g].count);
+                const sub = isMale ? `总${gens[g].count}人` : `男${gens[g].maleCount}`;
+                return `
+            <div class="gen-stat-card" onclick="app.navigateTo('people',{filterShiXi:${g}${isMale?',filterMale:1':''}})">
                 <div class="gen-stat-shi">第${g}世</div>
-                <div class="gen-stat-num">${gens[g].count}</div>
-                <div class="gen-stat-sub">男${gens[g].maleCount}</div>
-            </div>`).join('')}
+                <div class="gen-stat-num">${num}</div>
+                <div class="gen-stat-sub">${sub}</div>
+            </div>`; }).join('')}
         </div>
-        <div class="gen-stats-tip">💡 点击世代卡片可跳转到人员列表</div>`;
+        <div class="gen-stats-tip">${!st.showBefore17 ? '💡 当前仅显示第17世及之后的人员统计' : ''}<br>👆 点击世代卡片可跳转到人员列表</div>`;
+    }
+
+    toggleGenStatsFilter(name) {
+        const st = this._genStatsState;
+        if (name === 'filterMode') st.filterMode = st.filterMode === 'total' ? 'male' : 'total';
+        else st[name] = !st[name];
+        this.renderGenStats();
+    }
+
+    onGenStatsOverviewClick() {
+        const st = this._genStatsState;
+        const params = {};
+        if (st.filterMode === 'male') params.filterMale = 1;
+        if (!st.showDeceased) params.filterAlive = 1;
+        if (!st.showBefore17) params.onlyAfter17 = 1;
+        this.navigateTo('people', params);
     }
 
     // ═══ 我的页面 ═══
@@ -1822,7 +1944,7 @@ class ZupuApp {
         <div class="card me-about-card">
             <h3><i class="fas fa-code"></i> 关于程序</h3>
             <div class="me-about-info">
-                <span>版本：V1.05</span>
+                <span>版本：V1.06</span>
                 <span>开发者：化州保叔</span>
             </div>
         </div>`;
@@ -1975,7 +2097,7 @@ class ZupuApp {
             const isRead = m.is_read === 1;
             const images = m.image_urls ? (typeof m.image_urls === 'string' ? JSON.parse(m.image_urls) : m.image_urls) : [];
             return `
-            <div class="msg-card">
+            <div class="msg-card" data-msg-id="${m.id}">
                 <div class="msg-header">
                     <span class="msg-user">${m.nickname || m.li_shi_id || m.guest_id || '匿名'}</span>
                     <span class="msg-time">${timeAgo(m.created_at)}</span>
@@ -1993,6 +2115,8 @@ class ZupuApp {
                 </div>
             </div>`;
         }).join('');
+        // 触发懒加载
+        this._observeLazyImages();
     }
 
     async submitMessage() {
@@ -2053,13 +2177,42 @@ class ZupuApp {
     }
 
     replyMessage(id) {
-        const reply = prompt('回复留言：');
-        if (reply === null) return;
+        // 检查是否已有内联回复框，有则聚焦
+        const existing = document.getElementById(`reply-input-${id}`);
+        if (existing) { existing.focus(); return; }
+        // 在留言卡片下方插入内联回复框
+        const msgCard = document.querySelector(`[data-msg-id="${id}"]`);
+        if (!msgCard) return;
+        const replyBox = document.createElement('div');
+        replyBox.className = 'msg-reply-box';
+        replyBox.id = `reply-box-${id}`;
+        replyBox.innerHTML = `
+            <textarea id="reply-input-${id}" class="msg-reply-input" placeholder="输入回复内容..." rows="2" maxlength="500"></textarea>
+            <div class="msg-reply-actions">
+                <button class="btn btn-small" onclick="app.cancelReply(${id})">取消</button>
+                <button class="btn btn-small btn-primary" onclick="app.submitReply(${id})">发送回复</button>
+            </div>
+        `;
+        msgCard.appendChild(replyBox);
+        document.getElementById(`reply-input-${id}`)?.focus();
+    }
+
+    cancelReply(id) {
+        const box = document.getElementById(`reply-box-${id}`);
+        if (box) box.remove();
+    }
+
+    async submitReply(id) {
+        const input = document.getElementById(`reply-input-${id}`);
+        const reply = input?.value?.trim();
+        if (!reply) { showToast('请输入回复内容', 'error'); return; }
         showLoading();
-        api.replyMessage(id, reply).then(res => {
+        try {
+            const res = await api.replyMessage(id, reply);
             if (res.status === 'success') { showToast('回复成功', 'success'); this.loadMessages(); }
             else showToast(res.message || '回复失败', 'error');
-        }).catch(() => showToast('回复失败', 'error')).finally(() => hideLoading());
+        } catch (e) { showToast('回复失败', 'error'); }
+        finally { hideLoading(); }
     }
 
     async deleteMessage(id) {
@@ -2125,13 +2278,35 @@ class ZupuApp {
         const a = ann || {};
         const pageLabels = { index: '首页', 'announcement-board': '公告板', people: '人员管理', tree: '世系图', baota: '宝塔树', 'generation-names': '字辈列表', messages: '留言', me: '我的', worship: '祭拜' };
         const selectedPages = (a.pages || '').split(',').filter(s => s);
+        const tplVars = [
+            { key: '{{username}}', label: '用户名' },
+            { key: '{{li_shi_id}}', label: '李氏号' },
+            { key: '{{person_name}}', label: '人物姓名' },
+            { key: '{{generation}}', label: '字辈' },
+            { key: '{{shi_xi}}', label: '世系' }
+        ];
         const body = `
-            <div class="form-group"><label>公告内容 <span id="ann-char-count">${(a.content||'').length}/500</span></label><textarea id="ann-content-input" maxlength="500" rows="4" oninput="document.getElementById('ann-char-count').textContent=this.value.length+'/500'">${a.content || ''}</textarea></div>
+            <div class="form-group"><label>公告内容 <span id="ann-char-count">${(a.content||'').length}/500</span></label>
+                <div class="ann-tpl-bar">插入变量：${tplVars.map(v => `<button type="button" class="btn btn-small btn-outline" onclick="app._insertAnnTemplate('${v.key}')">${v.label}</button>`).join('')}</div>
+                <textarea id="ann-content-input" maxlength="500" rows="4" oninput="document.getElementById('ann-char-count').textContent=this.value.length+'/500'">${a.content || ''}</textarea>
+            </div>
             <div class="form-group"><label>展示页面</label><div class="ann-page-chips">${Object.keys(pageLabels).map(k => `<label class="chip-selectable"><input type="checkbox" name="ann-pages" value="${k}" ${selectedPages.includes(k)?'checked':''}>${pageLabels[k]}</label>`).join('')}</div></div>
             <div class="form-group"><label>展示时长（秒）</label><input type="number" id="ann-duration-input" min="1" max="120" value="${a.scroll_duration || 8}"></div>
             <div class="form-group"><label><input type="checkbox" id="ann-scroll-enabled" ${a.scroll_enabled !== 0 ? 'checked' : ''}> 启用滚动效果</label></div>
         `;
         this.showDynamicModal(isEdit ? '编辑公告' : '新建公告', body, () => this._saveAnnouncement(isEdit ? a.id : null));
+    }
+
+    _insertAnnTemplate(key) {
+        const input = document.getElementById('ann-content-input');
+        if (!input) return;
+        const start = input.selectionStart;
+        const end = input.selectionEnd;
+        const val = input.value;
+        input.value = val.substring(0, start) + key + val.substring(end);
+        input.selectionStart = input.selectionEnd = start + key.length;
+        input.focus();
+        document.getElementById('ann-char-count').textContent = input.value.length + '/500';
     }
 
     async _saveAnnouncement(id) {
@@ -2219,7 +2394,12 @@ class ZupuApp {
                 <span style="font-size:12px;color:var(--text-muted);">${a.created_at ? new Date(a.created_at).toLocaleDateString() : ''}</span>
             </div>
             <div style="font-size:15px;color:var(--text-primary);line-height:1.8;">${this.renderAnnouncementTemplate(a.content || '')}</div>
-        </div>`).join('');
+        </div>`).join('') + `
+        <div class="board-bottom-nav">
+            <button class="btn btn-outline btn-block" onclick="app.navigateTo('home')" style="flex:1;"><i class="fas fa-home"></i> 首页</button>
+            <button class="btn btn-outline btn-block" onclick="app.navigateTo('baota')" style="flex:1;"><i class="fas fa-tree"></i> 宝塔树</button>
+            <button class="btn btn-outline btn-block" onclick="app.navigateTo('me')" style="flex:1;"><i class="fas fa-user"></i> 我的</button>
+        </div>`;
     }
 
     // ═══ 帐号管理 ═══
@@ -2281,10 +2461,13 @@ class ZupuApp {
                 <div class="admin-card-actions">
                     ${a.verified !== 1 ? `<button class="btn btn-small btn-outline" onclick="app.verifyMember('${a.li_shi_id}')">认证</button>` : ''}
                     ${a.verified === 1 && isSuperAdmin ? `<button class="btn btn-small btn-outline" onclick="app.unverifyMember('${a.li_shi_id}')">取消认证</button>` : ''}
+                    <button class="btn btn-small btn-outline" onclick="app.adminBindPerson('${a.li_shi_id}')">绑定人物</button>
                     ${isSuperAdmin ? `<button class="btn btn-small btn-outline" onclick="app.changeRole('${a.li_shi_id}')">改角色</button>` : ''}
                 </div>
             </div>`;
         }).join('');
+        // 触发懒加载
+        this._observeLazyImages();
     }
 
     toggleAdminSelect(liShiId) {
@@ -2311,6 +2494,11 @@ class ZupuApp {
             else showToast(res.message || '操作失败', 'error');
         } catch (e) { showToast('操作失败', 'error'); }
         finally { hideLoading(); }
+    }
+
+    adminBindPerson(liShiId) {
+        // 跳转宝塔树，管理员帮绑定模式
+        this.navigateTo('baota', { bind_mode: 1, admin_bind_li_shi_id: liShiId });
     }
 
     changeRole(liShiId) {
@@ -2434,9 +2622,9 @@ class ZupuApp {
                     <div class="altar-title">先祖之位</div>
                 </div>
                 <div class="altar-censer" id="altar-censer">
-                    <div class="altar-smoke-layer smoke-1"></div>
-                    <div class="altar-smoke-layer smoke-2"></div>
-                    <div class="altar-smoke-layer smoke-3"></div>
+                    <div class="altar-smoke-layer smoke-1" id="smoke-1"></div>
+                    <div class="altar-smoke-layer smoke-2" id="smoke-2"></div>
+                    <div class="altar-smoke-layer smoke-3" id="smoke-3"></div>
                     <div class="altar-incense-container" id="altar-incense-container"></div>
                 </div>
                 <div class="altar-candles">
@@ -2469,16 +2657,48 @@ class ZupuApp {
         } catch (e) {}
     }
 
+    /** ★ 启动香的视觉动画 + 烟雾 */
+    _startIncenseAnimation(count, duration) {
+        // 烟雾激活
+        for (let i = 1; i <= 3; i++) {
+            const smoke = document.getElementById(`smoke-${i}`);
+            if (smoke) smoke.classList.add('burning');
+        }
+        // 渲染香支
+        const incenseContainer = document.getElementById('altar-incense-container');
+        if (!incenseContainer) return;
+        incenseContainer.innerHTML = '';
+        for (let i = 0; i < count; i++) {
+            const stick = document.createElement('div');
+            stick.className = 'altar-incense-stick burning' + (count === 3 && i === 1 ? ' spark' : '');
+            stick.style.animationDuration = duration + 's';
+            incenseContainer.appendChild(stick);
+        }
+    }
+
+    /** ★ 停止香的视觉动画 + 烟雾 */
+    _stopIncenseAnimation() {
+        for (let i = 1; i <= 3; i++) {
+            const smoke = document.getElementById(`smoke-${i}`);
+            if (smoke) smoke.classList.remove('burning');
+        }
+        const incenseContainer = document.getElementById('altar-incense-container');
+        if (incenseContainer) incenseContainer.innerHTML = '';
+    }
+
     async offerIncense(ancestorId, count) {
         if (this.worshipBurning) { showToast('香正在燃烧中，请稍候', 'info'); return; }
         this.worshipBurning = true;
         this.worshipBurnSeq++;
         const seq = this.worshipBurnSeq;
-        const duration = (this._worshipConfig?.worship_incense_duration || 60) * 1000;
+        const durationSec = this._worshipConfig?.worship_incense_duration || 60;
+        const duration = durationSec * 1000;
         const startTime = Date.now();
         // 禁用按钮
         document.getElementById('btn-one-incense')?.setAttribute('disabled', 'true');
         document.getElementById('btn-three-incense')?.setAttribute('disabled', 'true');
+        // ★ 启动视觉动画（本地立即启动）
+        this._startIncenseAnimation(count, durationSec);
         // 显示进度
         const progressEl = document.getElementById('altar-progress');
         const updateProgress = () => {
@@ -2489,7 +2709,7 @@ class ZupuApp {
             if (percent < 100) requestAnimationFrame(updateProgress);
         };
         updateProgress();
-        // 异步调API
+        // 异步调API（动画已启动，后台调用）
         let allSuccess = true;
         let totalMeritGained = 0;
         let totalMeritCost = 0;
@@ -2506,28 +2726,36 @@ class ZupuApp {
                 } else { allSuccess = false; break; }
             } catch (e) { allSuccess = false; break; }
         }
+        // API失败则停止动画
+        if (!allSuccess) {
+            this._stopIncenseAnimation();
+            this.worshipBurning = false;
+            document.getElementById('btn-one-incense')?.removeAttribute('disabled');
+            document.getElementById('btn-three-incense')?.removeAttribute('disabled');
+            if (progressEl) progressEl.textContent = '';
+            showToast('上香失败，请重试', 'error');
+            return;
+        }
         // 等待燃烧时间
         await new Promise(resolve => setTimeout(resolve, Math.max(0, duration - (Date.now() - startTime))));
         if (this.worshipBurnSeq !== seq) return;
         this.worshipBurning = false;
+        // ★ 停止动画
+        this._stopIncenseAnimation();
         document.getElementById('btn-one-incense')?.removeAttribute('disabled');
         document.getElementById('btn-three-incense')?.removeAttribute('disabled');
         if (progressEl) progressEl.textContent = '';
-        if (allSuccess) {
-            // 功德弹窗
-            this.showDynamicModal('🙏 祭拜功德圆满', `
-                <div style="text-align:center;padding:20px;">
-                    <div style="font-size:20px;margin-bottom:12px;">获得功德 <span style="color:#27ae60;font-weight:bold;">+${totalMeritGained}</span></div>
-                    ${totalMeritCost > 0 ? `<div style="font-size:14px;color:var(--text-secondary);margin-bottom:8px;">消耗积分 <span style="color:#e74c3c;">-${totalMeritCost}</span></div>` : ''}
-                    <div style="font-size:14px;color:var(--text-secondary);">当前功德 <strong>${lastMeritPoints}</strong> | 累计上香 <strong>${lastTotalIncense}</strong>次</div>
-                </div>
-            `, () => this.closeDynamicModal());
-            setTimeout(() => { if (document.getElementById('dynamic-modal')?.classList.contains('hidden') === false) this.closeDynamicModal(); }, 3500);
-            const info = document.getElementById('altar-merit-info');
-            if (info) info.textContent = `当前功德: ${lastMeritPoints} | 累计上香: ${lastTotalIncense}次`;
-        } else {
-            showToast('上香失败，请重试', 'error');
-        }
+        // 功德弹窗
+        this.showDynamicModal('🙏 祭拜功德圆满', `
+            <div style="text-align:center;padding:20px;">
+                <div style="font-size:20px;margin-bottom:12px;">获得功德 <span style="color:#27ae60;font-weight:bold;">+${totalMeritGained}</span></div>
+                ${totalMeritCost > 0 ? `<div style="font-size:14px;color:var(--text-secondary);margin-bottom:8px;">消耗积分 <span style="color:#e74c3c;">-${totalMeritCost}</span></div>` : ''}
+                <div style="font-size:14px;color:var(--text-secondary);">当前功德 <strong>${lastMeritPoints}</strong> | 累计上香 <strong>${lastTotalIncense}</strong>次</div>
+            </div>
+        `, () => this.closeDynamicModal());
+        setTimeout(() => { if (document.getElementById('dynamic-modal')?.classList.contains('hidden') === false) this.closeDynamicModal(); }, 3500);
+        const info = document.getElementById('altar-merit-info');
+        if (info) info.textContent = `当前功德: ${lastMeritPoints} | 累计上香: ${lastTotalIncense}次`;
     }
 
     // ═══ 祭拜设置（超管） ═══
@@ -2539,6 +2767,7 @@ class ZupuApp {
             this._worshipAdminConfig = configRes.status === 'success' ? configRes.data : {};
             this._worshipAdminMeritList = meritRes.status === 'success' ? (meritRes.data || []) : [];
             this.renderWorshipAdmin();
+            this.loadAnnouncementsForPage('worship', 'worship-admin-announcement-bar', 'worship-admin-ann-scroll-area', 'worship-admin-ann-text');
         } catch (e) { showToast('加载失败', 'error'); }
         finally { hideLoading(); }
     }
@@ -2624,8 +2853,22 @@ class ZupuApp {
         try {
             const [recordsRes, boardRes] = await Promise.all([api.getWorshipRecentRecords(50), api.getWorshipMeritBoard(50)]);
             this.renderWorshipLiveRank(recordsRes.status === 'success' ? (recordsRes.data || []) : [], boardRes.status === 'success' ? (boardRes.data || []) : []);
+            // ★ 10秒自动刷新
+            if (this.worshipLiveRankTimer) clearInterval(this.worshipLiveRankTimer);
+            this.worshipLiveRankTimer = setInterval(() => this._refreshLiveRank(), 10000);
         } catch (e) { showToast('加载失败', 'error'); }
         finally { hideLoading(); }
+    }
+
+    async _refreshLiveRank() {
+        try {
+            const [recordsRes, boardRes] = await Promise.all([api.getWorshipRecentRecords(50), api.getWorshipMeritBoard(50)]);
+            this.renderWorshipLiveRank(recordsRes.status === 'success' ? (recordsRes.data || []) : [], boardRes.status === 'success' ? (boardRes.data || []) : []);
+        } catch (e) { /* 静默 */ }
+    }
+
+    stopLiveRankTimer() {
+        if (this.worshipLiveRankTimer) { clearInterval(this.worshipLiveRankTimer); this.worshipLiveRankTimer = null; }
     }
 
     renderWorshipLiveRank(records, board) {
@@ -2666,21 +2909,532 @@ class ZupuApp {
             </div>`).join('')}</div>`;
     }
 
-    // ═══ 世系图/宝塔树（已有基础，后续优化） ═══
-    async loadTree() { /* 已有实现 */ }
-    async loadBaota(showBefore17) { /* 已有实现 */ }
+    // ═══ 世系图 ═══
+    _treeState = { viewMode: 'hierarchy', pureLineageId: '', showAll: false, searchKeyword: '', searchResults: [] };
 
-    // 世系图缩放
-    zoomTree(delta) { this.treeZoom = Math.max(50, Math.min(200, this.treeZoom + delta)); document.getElementById('tree-zoom-level').textContent = this.treeZoom + '%'; }
-    resetTreeZoom() { this.treeZoom = 100; document.getElementById('tree-zoom-level').textContent = '100%'; }
-    setTreeMode(mode) { this.treeMode = mode; }
+    async loadTree() {
+        showLoading();
+        try {
+            if (this.peopleData.length === 0) {
+                const res = await api.getPeople();
+                if (res.status === 'success') { this.peopleData = res.data || []; this.buildPeopleDict(); }
+            }
+            this.loadAnnouncementsForPage('tree', 'tree-announcement-bar', 'tree-ann-scroll-area', 'tree-ann-text');
+            this.renderTree();
+            this._initDrag('tree-container');
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
+    }
 
-    // 宝塔树缩放
-    zoomBaota(delta) { this.baotaZoom = Math.max(50, Math.min(300, this.baotaZoom + delta)); document.getElementById('baota-zoom-level').textContent = this.baotaZoom + '%'; }
-    resetBaotaZoom() { this.baotaZoom = 100; document.getElementById('baota-zoom-level').textContent = '100%'; }
+    renderTree() {
+        const canvas = document.getElementById('tree-canvas');
+        if (!canvas) return;
+        const st = this._treeState;
+        const people = this.peopleData.filter(p => !this.isSpouse(p));
+        const allPeople = this.peopleData;
 
-    // 世系图选中人员操作
-    addRelative(type) { showToast('添加' + type + '功能开发中', 'info'); }
+        // ★ 构建层级列表数据
+        const childrenMap = {}; // fatherId -> [children]
+        const rootPeople = [];
+        people.forEach(p => {
+            const fid = p.father_id ? String(p.father_id) : '';
+            if (fid && fid !== '0') {
+                if (!childrenMap[fid]) childrenMap[fid] = [];
+                childrenMap[fid].push(p);
+            } else {
+                rootPeople.push(p);
+            }
+        });
+
+        // ★★★ 过继逻辑：解析 adopt_father_ids，继子加入继父的 childrenMap ★★★
+        people.forEach(p => {
+            const rawIds = p.adopt_father_ids;
+            if (!rawIds) return;
+            try {
+                const ids = JSON.parse(rawIds);
+                ids.forEach(aid => {
+                    if (!aid || aid === '0') return;
+                    if (!childrenMap[aid]) childrenMap[aid] = [];
+                    if (!childrenMap[aid].find(x => String(x.id) === String(p.id) && x._isAdoptedBy)) {
+                        childrenMap[aid].push({ ...p, _isAdoptedBy: aid });
+                    }
+                });
+            } catch (e) { /* ignore */ }
+        });
+
+        // ★ 纯脉展示过滤
+        let displayPeople = people;
+        if (st.pureLineageId) {
+            const pureSet = this._calcPureLineage(st.pureLineageId, people);
+            displayPeople = people.filter(p => pureSet.has(String(p.id)));
+            // 重新计算根节点
+            const pureRoots = displayPeople.filter(p => {
+                const fid = p.father_id ? String(p.father_id) : '';
+                return !fid || fid === '0' || !pureSet.has(fid);
+            });
+            rootPeople.length = 0;
+            rootPeople.push(...pureRoots);
+        }
+
+        // ★ 搜索高亮
+        const keyword = st.searchKeyword.toLowerCase();
+        const searchMatchIds = new Set();
+        if (keyword) {
+            allPeople.forEach(p => {
+                if ((p.name && p.name.toLowerCase().includes(keyword)) ||
+                    (p.generation && p.generation.toLowerCase().includes(keyword)) ||
+                    (p.alias && p.alias.toLowerCase().includes(keyword))) {
+                    searchMatchIds.add(String(p.id));
+                }
+            });
+        }
+
+        // ★ 渲染层级列表
+        const role = getCurrentRole();
+        const renderNode = (person, level = 0) => {
+            const id = String(person.id);
+            const isMatch = searchMatchIds.has(id);
+            const children = (childrenMap[id] || []).filter(c => displayPeople.find(dp => String(dp.id) === String(c.id)));
+            const spouse = allPeople.find(p => String(p.spouse_of_id) === id);
+            const expandClass = st.showAll || isMatch ? 'tree-node-expanded' : (level < 2 ? 'tree-node-expanded' : '');
+            const isAdopted = !!person._isAdoptedBy;
+            const displayName = getDisplayName(person);
+            const spouseName = spouse ? getDisplayName(spouse) : '';
+
+            let html = `
+            <div class="tree-node ${expandClass} ${isMatch ? 'tree-node-highlight' : ''} ${isAdopted ? 'tree-node-adopted' : ''}" data-id="${id}" onclick="app.selectTreePerson(${person.id})">
+                <div class="tree-node-content" style="padding-left:${level * 24}px;">
+                    ${children.length > 0 ? `<span class="tree-toggle" onclick="event.stopPropagation();app.toggleTreeNode(this)"><i class="fas fa-chevron-right"></i></span>` : '<span class="tree-toggle-placeholder"></span>'}
+                    ${this.renderGenderAvatar(person, 'tree-node-avatar')}
+                    <div class="tree-node-info">
+                        <span class="tree-node-name">${displayName}${isAdopted ? ' <small class="adopt-tag">继</small>' : ''}</span>
+                        <span class="tree-node-meta">${person.generation || ''} 第${person.shi_xi || '?'}世 ${spouseName ? '· 配偶:' + spouseName : ''}</span>
+                    </div>
+                    <span class="alive-dot ${this.isAlive(person) ? 'alive' : 'dead'}"></span>
+                </div>
+            </div>`;
+            if (children.length > 0) {
+                html += `<div class="tree-children ${expandClass ? '' : 'hidden'}">`;
+                children.forEach(c => { html += renderNode(c, level + 1); });
+                html += '</div>';
+            }
+            return html;
+        };
+
+        let treeHtml = '';
+        // ★ 搜索结果下拉
+        if (keyword && st.searchResults.length > 0) {
+            treeHtml += `<div class="tree-search-dropdown">
+                ${st.searchResults.slice(0, 10).map(p => `
+                <div class="tree-search-item" onclick="app.treeSearchSelect(${p.id})">
+                    ${this.renderGenderAvatar(p, 'tree-search-avatar')} 
+                    <span>${getDisplayName(p)}</span>
+                    <small>第${p.shi_xi || '?'}世</small>
+                </div>`).join('')}
+            </div>`;
+        }
+
+        if (st.pureLineageId) {
+            treeHtml += `<div class="tree-pure-lineage-bar">
+                <span>🔗 纯脉展示模式</span>
+                <button class="btn btn-small btn-outline" onclick="app.exitPureLineage()">退出纯脉</button>
+            </div>`;
+        }
+
+        if (rootPeople.length === 0) {
+            treeHtml += '<p style="color:var(--text-muted);text-align:center;padding:40px;">暂无世系数据</p>';
+        } else {
+            rootPeople.forEach(p => { treeHtml += renderNode(p, 0); });
+        }
+
+        canvas.innerHTML = treeHtml;
+        canvas.style.transform = `scale(${this.treeZoom / 100})`;
+        canvas.style.transformOrigin = 'top left';
+        // 触发懒加载
+        this._observeLazyImages();
+    }
+
+    /** 计算纯脉展示的人员ID集合（BFS向下+向上回溯） */
+    _calcPureLineage(personId, people) {
+        const id = String(personId);
+        const childrenMap = {};
+        people.forEach(p => {
+            const fid = p.father_id ? String(p.father_id) : '';
+            if (fid && fid !== '0') {
+                if (!childrenMap[fid]) childrenMap[fid] = [];
+                childrenMap[fid].push(String(p.id));
+            }
+        });
+        const result = new Set();
+        // 向下BFS
+        const queue = [id];
+        while (queue.length) {
+            const cur = queue.shift();
+            if (result.has(cur)) continue;
+            result.add(cur);
+            (childrenMap[cur] || []).forEach(cid => queue.push(cid));
+        }
+        // 向上回溯
+        const peopleMap = {};
+        people.forEach(p => { peopleMap[String(p.id)] = p; });
+        let curId = id;
+        while (curId) {
+            const person = peopleMap[curId];
+            if (!person) break;
+            result.add(curId);
+            const fid = person.father_id ? String(person.father_id) : '';
+            if (fid && fid !== '0' && peopleMap[fid]) { curId = fid; }
+            else break;
+        }
+        // 保留纯脉中人员的配偶
+        this.peopleData.forEach(p => {
+            if (this.isSpouse(p) && result.has(String(p.spouse_of_id))) {
+                result.add(String(p.id));
+            }
+        });
+        return result;
+    }
+
+    toggleTreeNode(el) {
+        const node = el.closest('.tree-node');
+        const children = node?.nextElementSibling;
+        if (children && children.classList.contains('tree-children')) {
+            children.classList.toggle('hidden');
+            const icon = el.querySelector('i');
+            if (icon) icon.style.transform = children.classList.contains('hidden') ? '' : 'rotate(90deg)';
+        }
+    }
+
+    selectTreePerson(id) {
+        const person = this.peopleDict[id];
+        if (!person) return;
+        this.selectedTreePerson = person;
+        // 显示侧边面板
+        const panel = document.getElementById('tree-side-panel');
+        const nameEl = document.getElementById('selected-name');
+        const infoEl = document.getElementById('selected-info');
+        if (panel) panel.classList.remove('hidden');
+        if (nameEl) nameEl.textContent = getDisplayName(person);
+        if (infoEl) {
+            const spouse = this.peopleData.find(p => String(p.spouse_of_id) === String(person.id));
+            const hasFather = !!(person.father_id && String(person.father_id) !== '0');
+            const children = this.peopleData.filter(c => String(c.father_id) === String(person.id));
+            infoEl.innerHTML = `
+                <div class="side-person-avatar">${this.renderGenderAvatar(person, '', 60)}</div>
+                <div class="side-person-name">${getDisplayName(person)}</div>
+                <div class="side-person-meta">${person.generation ? '字辈:' + person.generation + ' ' : ''}第${person.shi_xi || '?'}世 ${person.ranking ? '· ' + person.ranking : ''}</div>
+                <div class="side-person-status">${this.isAlive(person) ? '🟢 健在' : '🔴 已逝'}</div>
+                ${spouse ? `<div class="side-person-spouse">配偶: ${getDisplayName(spouse)}</div>` : ''}
+                ${hasFather ? '' : '<div class="side-person-hint" style="color:var(--warning);">⚠️ 无父亲记录</div>'}
+                <div class="side-person-children">子女: ${children.length}人</div>
+                <div class="side-person-actions">
+                    <button class="btn btn-action" onclick="app.addRelative('father')" ${hasFather ? 'disabled' : ''}><i class="fas fa-arrow-up"></i> 添加父亲</button>
+                    <button class="btn btn-action" onclick="app.addRelative('son')"><i class="fas fa-child"></i> 添加儿子</button>
+                    <button class="btn btn-action" onclick="app.addRelative('spouse')" ${spouse ? 'disabled' : ''}><i class="fas fa-heart"></i> 添加配偶</button>
+                    <button class="btn btn-action" onclick="app.addRelative('sibling')"><i class="fas fa-arrows-alt-h"></i> 添加兄弟</button>
+                    <button class="btn btn-action" onclick="app.showPureLineage(${person.id})"><i class="fas fa-project-diagram"></i> 纯脉展示</button>
+                </div>
+            `;
+            // 启用/禁用操作按钮
+            const btnEdit = document.getElementById('btn-edit-person');
+            const btnView = document.getElementById('btn-view-person');
+            if (btnEdit) btnEdit.disabled = false;
+            if (btnView) btnView.disabled = false;
+        }
+    }
+
+    /** 纯脉展示 */
+    showPureLineage(personId) {
+        this._treeState.pureLineageId = String(personId);
+        this.renderTree();
+        showToast('已进入纯脉展示模式', 'info');
+    }
+
+    exitPureLineage() {
+        this._treeState.pureLineageId = '';
+        this.renderTree();
+    }
+
+    /** 世系图搜索 */
+    treeSearch(keyword) {
+        this._treeState.searchKeyword = keyword;
+        if (!keyword) { this._treeState.searchResults = []; this.renderTree(); return; }
+        const kw = keyword.toLowerCase();
+        this._treeState.searchResults = this.peopleData.filter(p =>
+            (p.name && p.name.toLowerCase().includes(kw)) ||
+            (p.generation && p.generation.toLowerCase().includes(kw)) ||
+            (p.alias && p.alias.toLowerCase().includes(kw))
+        );
+        this.renderTree();
+    }
+
+    treeSearchSelect(id) {
+        this._treeState.searchKeyword = '';
+        this._treeState.searchResults = [];
+        this.showPureLineage(id);
+        this.selectTreePerson(id);
+        // 延迟滚动到选中节点
+        setTimeout(() => {
+            const nodeEl = document.querySelector(`.tree-node[data-id="${id}"]`);
+            if (nodeEl) nodeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+    }
+
+    addRelative(type) {
+        if (!this.selectedTreePerson) return;
+        const p = this.selectedTreePerson;
+        if (type === 'father') this.navigateTo('person-edit', { relation: 'father', targetId: p.id, targetName: encodeURIComponent(p.name), gender: '男' });
+        else if (type === 'son') this.navigateTo('person-edit', { relation: 'child', targetId: p.id, targetName: encodeURIComponent(p.name), father_id: p.id, shi_xi: String(parseInt(p.shi_xi || 1) + 1), gender: '男' });
+        else if (type === 'spouse') this.navigateTo('person-edit', { relation: 'spouse', targetId: p.id, targetName: encodeURIComponent(p.name) });
+        else if (type === 'sibling') this.navigateTo('person-edit', { relation: 'sibling', targetId: p.id, targetName: encodeURIComponent(p.name), father_id: p.father_id, shi_xi: p.shi_xi, gender: '男' });
+    }
+
+    // ═══ 宝塔树 ═══
+    _baotaState = { pureLineageId: '', searchKeyword: '', bindMode: false, adminBindLiShiId: '' };
+
+    async loadBaota(showBefore17) {
+        showLoading();
+        try {
+            if (this.peopleData.length === 0) {
+                const res = await api.getPeople();
+                if (res.status === 'success') { this.peopleData = res.data || []; this.buildPeopleDict(); }
+            }
+            // 检查绑定模式
+            const params = this._navParams || {};
+            this._baotaState.bindMode = !!params.bind_mode;
+            this._baotaState.adminBindLiShiId = params.admin_bind_li_shi_id || '';
+            if (this._baotaState.bindMode) {
+                const bindBtn = document.getElementById('baota-btn-bind-person');
+                if (bindBtn) { bindBtn.classList.remove('hidden'); bindBtn.disabled = false; }
+            }
+            this.renderBaota();
+            this._initDrag('baota-container');
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    renderBaota() {
+        const canvas = document.getElementById('baota-canvas');
+        if (!canvas) return;
+        const st = this._baotaState;
+        const showBefore17 = document.getElementById('show-before-17')?.checked ?? true;
+        let people = this.peopleData.filter(p => !this.isSpouse(p));
+        if (!showBefore17) people = people.filter(p => parseInt(p.shi_xi) >= 17);
+
+        // 纯脉过滤
+        if (st.pureLineageId) {
+            const pureSet = this._calcPureLineage(st.pureLineageId, this.peopleData.filter(p => !this.isSpouse(p)));
+            people = people.filter(p => pureSet.has(String(p.id)));
+        }
+
+        // 构建世代分组
+        const genMap = {};
+        people.forEach(p => {
+            const g = parseInt(p.shi_xi) || 0;
+            if (g <= 0) return;
+            if (!genMap[g]) genMap[g] = [];
+            genMap[g].push(p);
+        });
+
+        // ★★★ 过继逻辑：继子也出现在继父的世代行中 ★★★
+        this.peopleData.filter(p => !this.isSpouse(p)).forEach(p => {
+            const rawIds = p.adopt_father_ids;
+            if (!rawIds) return;
+            try {
+                const ids = JSON.parse(rawIds);
+                ids.forEach(aid => {
+                    const adoptFather = this.peopleDict[aid];
+                    if (!adoptFather) return;
+                    const g = parseInt(adoptFather.shi_xi) + 1;
+                    if (g <= 0) return;
+                    if (!genMap[g]) genMap[g] = [];
+                    // 避免重复
+                    if (!genMap[g].find(x => String(x.id) === String(p.id) && x._isAdoptedBy)) {
+                        genMap[g].push({ ...p, _isAdoptedBy: aid, shi_xi: String(g) });
+                    }
+                });
+            } catch (e) { /* ignore */ }
+        });
+        const sortedGens = Object.keys(genMap).map(Number).sort((a, b) => a - b);
+
+        const role = getCurrentRole();
+        const keyword = st.searchKeyword.toLowerCase();
+
+        let html = '';
+        // 纯脉提示
+        if (st.pureLineageId) {
+            html += `<div class="tree-pure-lineage-bar">
+                <span>🔗 纯脉展示模式</span>
+                <button class="btn btn-small btn-outline" onclick="app.exitBaotaPureLineage()">退出纯脉</button>
+            </div>`;
+        }
+        // 绑定模式提示
+        if (st.bindMode) {
+            html += `<div class="tree-pure-lineage-bar" style="background:linear-gradient(135deg,#e0e7ff,#c7d2fe);">
+                <span>🔗 绑定人物模式 — 点击人物节点完成绑定</span>
+            </div>`;
+        }
+
+        sortedGens.forEach(g => {
+            const genPeople = genMap[g];
+            html += `<div class="baota-gen-row">
+                <div class="baota-gen-label">第${g}世</div>
+                <div class="baota-gen-nodes">`;
+            genPeople.forEach(p => {
+                const isMatch = keyword && ((p.name && p.name.toLowerCase().includes(keyword)) || (p.generation && p.generation.toLowerCase().includes(keyword)));
+                const spouse = this.peopleData.find(sp => String(sp.spouse_of_id) === String(p.id));
+                const isAdopted = !!p._isAdoptedBy;
+                html += `
+                <div class="baota-node ${isMatch ? 'baota-node-highlight' : ''} ${isAdopted ? 'baota-node-adopted' : ''}" data-id="${p.id}" onclick="app.selectBaotaPerson(${p.id})">
+                    ${this.renderGenderAvatar(p, 'baota-node-avatar')}
+                    <div class="baota-node-name">${getDisplayName(p)}${isAdopted ? ' <small class="adopt-tag">继</small>' : ''}</div>
+                    ${p.generation ? `<div class="baota-node-gen">${p.generation}</div>` : ''}
+                    ${spouse ? `<div class="baota-node-spouse">配偶:${getDisplayName(spouse)}</div>` : ''}
+                    <span class="alive-dot ${this.isAlive(p) ? 'alive' : 'dead'}" style="position:absolute;top:4px;right:4px;"></span>
+                </div>`;
+            });
+            html += '</div></div>';
+        });
+
+        canvas.innerHTML = html;
+        canvas.style.transform = `scale(${this.baotaZoom / 100})`;
+        canvas.style.transformOrigin = 'top center';
+        // 触发懒加载
+        this._observeLazyImages();
+    }
+
+    selectBaotaPerson(id) {
+        const person = this.peopleDict[id];
+        if (!person) return;
+        this.selectedBaotaPerson = person;
+        const st = this._baotaState;
+
+        // 绑定模式：直接绑定
+        if (st.bindMode && !st.adminBindLiShiId) {
+            this.showConfirm('绑定人物', `确定绑定"${getDisplayName(person)}"吗？`, async () => {
+                await this.bindPerson(person.id);
+            });
+            return;
+        }
+        // 管理员帮绑定模式
+        if (st.bindMode && st.adminBindLiShiId) {
+            this.showConfirm('管理员帮绑定', `确定将该人物绑定给帐号 ${st.adminBindLiShiId} 吗？`, async () => {
+                // 需要调用绑定API
+                try {
+                    showLoading();
+                    // 先获取该帐号的wx_account信息，再绑定
+                    const res = await api.bindWechatPerson(person.id);
+                    if (res.status === 'success') { showToast('绑定成功', 'success'); this.navigateTo('admin-accounts'); }
+                    else showToast(res.message || '绑定失败', 'error');
+                } catch (e) { showToast('绑定失败', 'error'); }
+                finally { hideLoading(); }
+            });
+            return;
+        }
+
+        // 正常选择：显示侧边面板
+        const panel = document.getElementById('baota-side-panel');
+        const nameEl = document.getElementById('baota-selected-name');
+        const infoEl = document.getElementById('baota-selected-info');
+        if (panel) panel.classList.remove('hidden');
+        if (nameEl) nameEl.textContent = getDisplayName(person);
+        if (infoEl) {
+            const spouse = this.peopleData.find(p => String(p.spouse_of_id) === String(person.id));
+            const children = this.peopleData.filter(c => String(c.father_id) === String(person.id));
+            infoEl.innerHTML = `
+                <div class="side-person-avatar">${this.renderGenderAvatar(person, '', 60)}</div>
+                <div class="side-person-name">${getDisplayName(person)}</div>
+                <div class="side-person-meta">${person.generation ? '字辈:' + person.generation + ' ' : ''}第${person.shi_xi || '?'}世 ${person.ranking ? '· ' + person.ranking : ''}</div>
+                <div class="side-person-status">${this.isAlive(person) ? '🟢 健在' : '🔴 已逝'}</div>
+                ${spouse ? `<div class="side-person-spouse">配偶: ${getDisplayName(spouse)}</div>` : ''}
+                <div class="side-person-children">子女: ${children.length}人</div>
+                <div class="side-person-actions">
+                    <button class="btn btn-action" onclick="app.showBaotaPureLineage(${person.id})"><i class="fas fa-project-diagram"></i> 纯脉展示</button>
+                </div>
+            `;
+            // 启用按钮
+            document.getElementById('baota-btn-add-son')?.removeAttribute('disabled');
+            document.getElementById('baota-btn-edit-person')?.removeAttribute('disabled');
+            document.getElementById('baota-btn-view-person')?.removeAttribute('disabled');
+        }
+    }
+
+    showBaotaPureLineage(personId) {
+        this._baotaState.pureLineageId = String(personId);
+        this.renderBaota();
+    }
+
+    exitBaotaPureLineage() {
+        this._baotaState.pureLineageId = '';
+        this.renderBaota();
+    }
+
+    // 世系图缩放（同步更新canvas transform）
+    zoomTree(delta) {
+        this.treeZoom = Math.max(50, Math.min(200, this.treeZoom + delta));
+        document.getElementById('tree-zoom-level').textContent = this.treeZoom + '%';
+        const canvas = document.getElementById('tree-canvas');
+        if (canvas) canvas.style.transform = `scale(${this.treeZoom / 100})`;
+    }
+    resetTreeZoom() {
+        this.treeZoom = 100;
+        document.getElementById('tree-zoom-level').textContent = '100%';
+        const canvas = document.getElementById('tree-canvas');
+        if (canvas) { canvas.style.transform = 'scale(1)'; canvas.style.transformOrigin = 'top left'; }
+    }
+    setTreeMode(mode) { this.treeMode = mode; this.renderTree(); }
+
+    // 宝塔树缩放（同步更新canvas transform）
+    zoomBaota(delta) {
+        this.baotaZoom = Math.max(50, Math.min(300, this.baotaZoom + delta));
+        document.getElementById('baota-zoom-level').textContent = this.baotaZoom + '%';
+        const canvas = document.getElementById('baota-canvas');
+        if (canvas) canvas.style.transform = `scale(${this.baotaZoom / 100})`;
+    }
+    resetBaotaZoom() {
+        this.baotaZoom = 100;
+        document.getElementById('baota-zoom-level').textContent = '100%';
+        const canvas = document.getElementById('baota-canvas');
+        if (canvas) { canvas.style.transform = 'scale(1)'; canvas.style.transformOrigin = 'top center'; }
+    }
+
+    // 世系图/宝塔树 拖拽功能
+    _initDrag(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        let isDragging = false, startX = 0, startY = 0, scrollStartX = 0, scrollStartY = 0;
+        container.addEventListener('mousedown', e => {
+            if (e.target.closest('.tree-node, .baota-node, .tree-toggle, button, a')) return;
+            isDragging = true; startX = e.clientX; startY = e.clientY;
+            scrollStartX = container.scrollLeft; scrollStartY = container.scrollTop;
+            container.style.cursor = 'grabbing';
+        });
+        document.addEventListener('mousemove', e => {
+            if (!isDragging) return;
+            container.scrollLeft = scrollStartX - (e.clientX - startX);
+            container.scrollTop = scrollStartY - (e.clientY - startY);
+        });
+        document.addEventListener('mouseup', () => {
+            if (isDragging) { isDragging = false; container.style.cursor = ''; }
+        });
+        // Ctrl+滚轮缩放
+        container.addEventListener('wheel', e => {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                const isTree = containerId === 'tree-container';
+                if (isTree) this.zoomTree(e.deltaY < 0 ? 10 : -10);
+                else this.zoomBaota(e.deltaY < 0 ? 10 : -10);
+            }
+        }, { passive: false });
+    }
+
+    // 全部展开/收起
+    toggleExpandAll() {
+        this._treeState.showAll = !this._treeState.showAll;
+        this.renderTree();
+    }
+
+    // 世系图选中人员操作（addRelative在3105行已完整实现，此处不可重复定义）
     editSelectedTreePerson() { if (this.selectedTreePerson) this.navigateTo('person-edit', { id: this.selectedTreePerson.id }); }
     viewSelectedTreePerson() { if (this.selectedTreePerson) this.navigateTo('person-detail', { id: this.selectedTreePerson.id }); }
 
@@ -2704,36 +3458,5 @@ class ZupuApp {
     closeBaotaPanel() { document.getElementById('baota-side-panel')?.classList.add('hidden'); this.selectedBaotaPerson = null; }
 }
 
-// ═══ 全局工具函数 ═══
+// ═══ 全局实例 ═══
 const app = new ZupuApp();
-
-function showToast(msg, type = 'info') {
-    const el = document.getElementById('toast');
-    if (!el) return;
-    el.textContent = msg;
-    el.className = `toast toast-${type}`;
-    el.classList.remove('hidden');
-    clearTimeout(el._timer);
-    el._timer = setTimeout(() => el.classList.add('hidden'), 2500);
-}
-
-function showLoading() { document.getElementById('loading')?.classList.remove('hidden'); }
-function hideLoading() { document.getElementById('loading')?.classList.add('hidden'); }
-
-function timeAgo(dateStr) {
-    if (!dateStr) return '';
-    const now = Date.now();
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return '';
-    const diff = now - d.getTime();
-    if (diff < 60000) return '刚刚';
-    if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
-    if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
-    if (diff < 2592000000) return Math.floor(diff / 86400000) + '天前';
-    return d.toLocaleDateString();
-}
-
-function maskPhone(phone) {
-    if (!phone || phone.length < 7) return phone || '';
-    return phone.substring(0, 3) + '****' + phone.substring(phone.length - 4);
-}
