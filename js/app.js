@@ -635,12 +635,24 @@ class ZupuApp {
         const father = p.father_id ? this.peopleDict[p.father_id] : null;
         const children = this.peopleData.filter(c => c.father_id == p.id);
         const role = getCurrentRole();
-        const canEdit = isAdmin() || isSelf(p);
+        const isVerifiedMember = role === 'member' && this.currentUser?.personId;
+        // ★★★ 权限改造：区分基本信息和世系关系字段
+        // 管理员：可编辑所有（基本信息+世系关系）
+        // 已认证+已绑定的普通成员(member)：可编辑基本信息（前端宽松判断，后端精确校验上下三代范围）
+        // 未认证/游客：不可编辑
+        let canEdit = false;
+        if (isAdmin()) {
+            canEdit = true;
+        } else if (isVerifiedMember) {
+            canEdit = true; // 前端宽松，后端会精确校验上下三代范围
+        }
         const canDelete = isAdmin() && children.length === 0;
-        const canBind = !isGuest() && isVerifiedUser() && !isAdmin() && !isSelf(p);
-        const canUnbind = !isAdmin() && this.currentUser?.personId && String(p.id) === String(this.currentUser.personId);
+        // ★ 已认证但尚未绑定的member可以看到绑定按钮（首次绑定）
+        const canBind = role === 'member' && !this.currentUser?.personId && !isSelf(p);
+        // ★★★ 修改：已认证+已绑定的普通成员不能自行解绑，只有管理员可以解绑
+        const canUnbind = isAdmin() && this.currentUser?.personId && String(p.id) === String(this.currentUser.personId);
 
-        const calcAge = (b, d) => { if (!b) return null; const by = parseInt(b.substring(0,4)); if (isNaN(by)) return null; const dy = d ? parseInt(d.substring(0,4)) : new Date().getFullYear(); return isNaN(dy) ? null : dy - by; };
+        const calcAge = (b, d) => { if (!b) return null; const by = parseInt(b.substring(0,4)); if (isNaN(by)) return null; const dy = d ? parseInt(d.substring(0,4)) : null; /* ★ 有去世日期时：传统享年=去世年-出生年+1(虚岁)；健在时不计算 */ if (d && !isNaN(dy)) return dy - by + 1; return null; };
         const deathAge = calcAge(p.birth_date, p.death_date);
 
         container.innerHTML = `
