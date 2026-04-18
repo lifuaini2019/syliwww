@@ -443,6 +443,20 @@ class ZupuAPI {
   async exportData() {
     return this.request('/export', 'GET');
   }
+
+  // ═══ 数据库备份与恢复（★对齐小程序，仅超管） ═══
+
+  async dbBackupCreate() {
+    return this.request('/db-backup/backup', 'POST');
+  }
+
+  async dbBackupList() {
+    return this.request('/db-backup/list', 'GET');
+  }
+
+  async dbBackupRestore(key, confirm) {
+    return this.request('/db-backup/restore', 'POST', { key, confirm: !!confirm });
+  }
 }
 
 const api = new ZupuAPI();

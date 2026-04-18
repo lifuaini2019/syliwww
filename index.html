@@ -128,14 +128,8 @@
                     <li class="menu-item worship-menu-item" data-page="worship">
                         <i class="fas fa-fire"></i><span>祭拜祖先</span>
                     </li>
-                    <li class="menu-item admin-only hidden" data-page="admin-accounts">
-                        <i class="fas fa-user-shield"></i><span>帐号管理</span>
-                    </li>
-                    <li class="menu-item admin-only hidden" data-page="announcement-manage">
-                        <i class="fas fa-bullhorn"></i><span>公告管理</span>
-                    </li>
-                    <li class="menu-item super-admin-only hidden" data-page="worship-admin">
-                        <i class="fas fa-cog"></i><span>祭拜设置</span>
+                    <li class="menu-item admin-only hidden" data-page="admin-center">
+                        <i class="fas fa-shield-alt"></i><span>管理中心</span>
                     </li>
                     <li class="menu-item" data-page="announcement-board">
                         <i class="fas fa-clipboard-list"></i><span>公告板</span>
@@ -189,10 +183,7 @@
                         <div class="home-menu-item" onclick="app.navigateTo('generation-names')"><div class="menu-icon gen"><span>📖</span></div><span class="menu-text">字辈列表</span></div>
                         <div class="home-menu-item" onclick="app.navigateTo('messages')"><div class="menu-icon msg"><span>✉️</span></div><span class="menu-text">我要留言</span></div>
                         <div class="home-menu-item worship-menu-home" onclick="app.navigateTo('worship')"><div class="menu-icon worship"><span>🕯️</span></div><span class="menu-text">祭拜祖先</span></div>
-                        <div class="home-menu-item admin-only hidden" onclick="app.navigateTo('admin-accounts')"><div class="menu-icon admin"><span>📋</span></div><span class="menu-text">帐号管理</span></div>
-                        <div class="home-menu-item admin-only hidden" onclick="app.navigateTo('messages')"><div class="menu-icon msg-admin"><span>✉️</span><span class="badge-danger" id="home-unread-badge" style="display:none">0</span></div><span class="menu-text">留言信箱</span></div>
-                        <div class="home-menu-item admin-only hidden" onclick="app.navigateTo('announcement-manage')"><div class="menu-icon ann"><span>📢</span></div><span class="menu-text">公告管理</span></div>
-                        <div class="home-menu-item super-admin-only hidden" onclick="app.navigateTo('worship-admin')"><div class="menu-icon worship-set"><span>⚙️</span></div><span class="menu-text">祭拜设置</span></div>
+                        <div class="home-menu-item admin-only hidden" onclick="app.navigateTo('admin-center')"><div class="menu-icon admin"><span>🛡️</span></div><span class="menu-text">管理中心</span></div>
                         <div class="home-menu-item" onclick="app.navigateTo('announcement-board',{fromPage:'index'})"><div class="menu-icon ann-board"><span>📋</span></div><span class="menu-text">公告板</span></div>
                     </div>
 
@@ -456,6 +447,16 @@
                     <div id="worship-merit-rank-content"></div>
                 </div>
 
+                <!-- ═══ 管理中心 ═══ -->
+                <div id="admin-center-section" class="content-section hidden">
+                    <div id="admin-center-content"></div>
+                </div>
+
+                <!-- ═══ 数据备份(超管) ═══ -->
+                <div id="db-backup-section" class="content-section hidden">
+                    <div id="db-backup-content"></div>
+                </div>
+
                 <!-- ═══ 我的页面 ═══ -->
                 <div id="me-section" class="content-section hidden">
                     <div id="me-content"></div>
@@ -499,9 +500,11 @@
         </div>
     </div>
 
-    <script src="js/privacy.js"></script>
+    <!-- 脚本引用 -->
+    <script src="js/lunar.js"></script>
     <script src="js/api.js"></script>
     <script src="js/wechat-login.js"></script>
+    <script src="js/privacy.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

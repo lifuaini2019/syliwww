@@ -165,7 +165,10 @@ class ZupuApp {
 
     // ═══ 工具函数 ═══
     isSpouse(p) { return !!(p.spouse_of_id && String(p.spouse_of_id) !== '0' && p.spouse_of_id !== ''); }
-    isAlive(p) { return p.is_alive !== 0 && !p.death_date; }
+    isAlive(p) { 
+        // ★★★ 任务14补充修复：严格以 is_alive 字段为准，不再暴力检查 death_date
+        return p.is_alive !== 0 && p.is_alive !== '0' && p.is_alive !== false;
+    }
 
     getRoleLabel(role) {
         return { guest: '匿名游客', user: '未认证', member: '家族成员', admin: '管理员', super_admin: '超管员' }[role] || role;
@@ -376,10 +379,12 @@ class ZupuApp {
             baota: () => this.loadBaota(true), 'generation-names': () => this.loadGenerationNames(),
             'gen-stats': () => this.loadGenStats(), messages: () => this.loadMessages(),
             'announcement-manage': () => this.loadAnnouncementManage(), 'announcement-board': () => this.loadAnnouncementBoard(),
-            'admin-accounts': () => this.loadAdminAccounts(), worship: () => this.loadWorship(),
+            'admin-accounts': () => this.loadAdminAccounts(), 'admin-center': () => this.loadAdminCenter(),
+            worship: () => this.loadWorship(),
             'worship-altar': () => this.loadWorshipAltar(params),
             'worship-admin': () => this.loadWorshipAdmin(), 'worship-live-rank': () => this.loadWorshipLiveRank(),
             'worship-merit-rank': () => this.loadWorshipMeritRank(), me: () => this.loadMe(),
+            'db-backup': () => this.loadDbBackup(),
             'person-detail': () => { if (params.id) this.loadPersonDetail(params.id); },
             'person-edit': () => this.loadPersonEdit(params)
         };
@@ -652,8 +657,15 @@ class ZupuApp {
         // ★★★ 修改：已认证+已绑定的普通成员不能自行解绑，只有管理员可以解绑
         const canUnbind = isAdmin() && this.currentUser?.personId && String(p.id) === String(this.currentUser.personId);
 
-        const calcAge = (b, d) => { if (!b) return null; const by = parseInt(b.substring(0,4)); if (isNaN(by)) return null; const dy = d ? parseInt(d.substring(0,4)) : null; /* ★ 有去世日期时：传统享年=去世年-出生年+1(虚岁)；健在时不计算 */ if (d && !isNaN(dy)) return dy - by + 1; return null; };
-        const deathAge = calcAge(p.birth_date, p.death_date);
+        const calcAge = (b, d) => { 
+            if (!b || !d) return null; 
+            const by = parseInt(b.substring(0,4)); 
+            const dy = parseInt(d.substring(0,4));
+            if (isNaN(by) || isNaN(dy)) return null; 
+            return dy - by + 1; 
+        };
+        // ★★★ 任务14补充修复：只有已逝人员才显示享年
+        const deathAge = !alive ? calcAge(p.birth_date, p.death_date) : null;
 
         container.innerHTML = `
         <div class="detail-back-bar">
@@ -677,7 +689,7 @@ class ZupuApp {
                 <div class="detail-item"><div class="detail-item-label">排行</div><div class="detail-item-value">${p.ranking||'-'}</div></div>
                 <div class="detail-item"><div class="detail-item-label">父亲</div><div class="detail-item-value">${father?`<a href="javascript:app.navigateTo('person-detail',{id:${father.id}})">${getDisplayName(father)}</a>`:'-'}</div></div>
                 <div class="detail-item"><div class="detail-item-label">出生</div><div class="detail-item-value">${p.birth_date||'-'}${p.birth_calendar?`(${p.birth_calendar})`:''}</div></div>
-                ${!alive?`<div class="detail-item"><div class="detail-item-label">去世</div><div class="detail-item-value">${p.death_date||'-'}${p.death_calendar?`(${p.death_calendar})`:''}</div></div>`:''}
+                ${!alive && p.death_date ? `<div class="detail-item"><div class="detail-item-label">去世</div><div class="detail-item-value">${p.death_date}${p.death_calendar?`(${p.death_calendar})`:''}</div></div>` : ''}
                 ${deathAge!==null?`<div class="detail-item"><div class="detail-item-label">享年</div><div class="detail-item-value">${deathAge}岁</div></div>`:''}
                 <div class="detail-item"><div class="detail-item-label">籍贯</div><div class="detail-item-value">${p.birth_place||'-'}</div></div>
                 <div class="detail-item"><div class="detail-item-label">现居地</div><div class="detail-item-value">${p.live_place||'-'}</div></div>
@@ -686,11 +698,20 @@ class ZupuApp {
             </div>
         </div>
         ${p.bio?`<div class="card"><h3><i class="fas fa-file-alt"></i> 生平简介</h3><p style="font-size:14px;color:var(--text-secondary);line-height:1.8;">${p.bio}</p></div>`:''}
+        ${p.other_image?`
+        <div class="card"><h3><i class="fas fa-images"></i> 其他图片</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">${p.other_image.split(',').filter(s=>s.trim()).map(url=>`<img src="${url.trim()}" style="max-width:150px;max-height:150px;border-radius:8px;cursor:pointer;object-fit:cover;" onclick="window.open('${url.trim()}','_blank')">`).join('')}</div></div>`:''}
         ${p.spouse_name||p.spouse_person?`
         <div class="card"><h3><i class="fas fa-heart"></i> 配偶信息</h3><div class="detail-grid">
             <div class="detail-item"><div class="detail-item-label">配偶</div><div class="detail-item-value">${p.spouse_person?`<a href="javascript:app.navigateTo('person-detail',{id:${p.spouse_person.id}})">${maskName(p.spouse_person.name,role)}</a>`:(maskName(p.spouse_name,role)||'-')}</div></div>
-            ${p.spouse_person?`<div class="detail-item"><div class="detail-item-label">配偶生日</div><div class="detail-item-value">${p.spouse_person.birth_date||'-'}</div></div>
-            <div class="detail-item"><div class="detail-item-label">配偶状态</div><div class="detail-item-value">${this.isAlive(p.spouse_person)?'健在':'已逝'}</div></div>`:''}
+            ${p.spouse_person?.alias?`<div class="detail-item"><div class="detail-item-label">配偶别名</div><div class="detail-item-value">${maskName(p.spouse_person.alias,role)}</div></div>`:''}
+            ${p.spouse_person?`<div class="detail-item"><div class="detail-item-label">配偶生日</div><div class="detail-item-value">${p.spouse_person.birth_date||'-'}${p.spouse_person.birth_calendar?`(${p.spouse_person.birth_calendar})`:''}</div></div>
+            <div class="detail-item"><div class="detail-item-label">配偶状态</div><div class="detail-item-value"><span class="badge ${this.isAlive(p.spouse_person)?'badge-alive':'badge-deceased'}">${this.isAlive(p.spouse_person)?'健在':'已逝'}</span></div></div>`:''}
+            ${p.spouse_person&&!this.isAlive(p.spouse_person)&&p.spouse_person.death_date?`<div class="detail-item"><div class="detail-item-label">配偶去世</div><div class="detail-item-value">${p.spouse_person.death_date}${p.spouse_person.death_calendar?`(${p.spouse_person.death_calendar})`:''}</div></div>`:''}
+            ${p.spouse_person&&!this.isAlive(p.spouse_person)&&p.spouse_person.birth_date&&p.spouse_person.death_date?`<div class="detail-item"><div class="detail-item-label">配偶享年</div><div class="detail-item-value">${calcAge(p.spouse_person.birth_date,p.spouse_person.death_date)}岁</div></div>`:''}
+            ${p.spouse_person?.birth_place?`<div class="detail-item"><div class="detail-item-label">配偶籍贯</div><div class="detail-item-value">${p.spouse_person.birth_place}</div></div>`:''}
+            ${p.spouse_person?.live_place?`<div class="detail-item"><div class="detail-item-label">配偶现居</div><div class="detail-item-value">${p.spouse_person.live_place}</div></div>`:''}
+            ${p.spouse_person?.bio?`<div class="detail-item" style="grid-column:1/-1"><div class="detail-item-label">配偶简介</div><div class="detail-item-value">${p.spouse_person.bio}</div></div>`:''}
         </div></div>`:''}
         ${p.wx_nickname||p.bound_wx_nickname?`
         <div class="card"><h3><i class="fab fa-weixin" style="color:#07c160;"></i> 已绑定微信</h3><div class="detail-grid">
@@ -994,10 +1015,9 @@ class ZupuApp {
         if (!birthDate || !deathDate) return null;
         const b = new Date(birthDate), d = new Date(deathDate);
         if (isNaN(b.getTime()) || isNaN(d.getTime()) || d < b) return null;
-        let age = d.getFullYear() - b.getFullYear();
-        const m = d.getMonth() - b.getMonth();
-        if (m < 0 || (m === 0 && d.getDate() < b.getDate())) age -= 1;
-        return age >= 0 ? age : null;
+        // ★★★ 对齐小程序：传统享年 = 去世年 - 出生年 + 1（虚岁：出生即1岁）
+        const age = d.getFullYear() - b.getFullYear() + 1;
+        return age >= 1 ? age : null;
     }
 
     _refreshDeathAgeHint() {
@@ -1012,6 +1032,32 @@ class ZupuApp {
         if (Number(f.spouse_alive) !== 0) { this._editState.spouseDeathAgeHint = ''; return; }
         const age = this._calcDeathAge(f.spouse_birth_date, f.spouse_death_date);
         this._editState.spouseDeathAgeHint = age === null ? '' : `享年 ${age} 岁`;
+    }
+
+    /** 统一日期输入渲染：公历用 input[type=date]，农历用三个 select */
+    _renderDateInput(field, value, calendar) {
+        if (calendar !== '农历') {
+            return `<input type="date" class="pe-date-input" id="edit-${field}" value="${value || ''}" min="1160-01-01" onchange="app._editOnDateChange('${field}', this.value)">`;
+        }
+        
+        // 农历逻辑
+        const lunar = lunarUtil.parseLunarDate(value) || { year: 2000, month: 1, day: 1, isLeapMonth: false };
+        const years = Array.from({length: 2026 - 1160 + 1}, (_, i) => 1160 + i);
+        const months = lunarUtil.getLunarMonthList(lunar.year);
+        const days = lunarUtil.getLunarDayList(lunar.year, lunar.month, lunar.isLeapMonth);
+
+        return `
+        <div class="pe-lunar-picker" data-field="${field}">
+            <select class="pe-lunar-select" onchange="app._editOnLunarPartChange('${field}', 'year', this.value)">
+                ${years.map(y => `<option value="${y}" ${y === lunar.year ? 'selected' : ''}>${y}年</option>`).join('')}
+            </select>
+            <select class="pe-lunar-select" onchange="app._editOnLunarPartChange('${field}', 'month', this.value)">
+                ${months.map((m, i) => `<option value="${i}" ${m.month === lunar.month && m.isLeap === lunar.isLeapMonth ? 'selected' : ''}>${m.name}</option>`).join('')}
+            </select>
+            <select class="pe-lunar-select" onchange="app._editOnLunarPartChange('${field}', 'day', this.value)">
+                ${days.map(d => `<option value="${d.value}" ${d.value === lunar.day ? 'selected' : ''}>${d.name}</option>`).join('')}
+            </select>
+        </div>`;
     }
 
     _renderPersonEdit() {
@@ -1153,7 +1199,7 @@ class ZupuApp {
                 <div class="pe-section-header">出生信息</div>
                 <div class="pe-date-row">
                     <span class="pe-field-label">出生日期：</span>
-                    <input type="date" class="pe-date-input" id="edit-${isSM ? 'spouse_birth_date' : 'birth_date'}" value="${birthDate}" min="1736-01-01" onchange="app._editOnDateChange('${isSM ? 'spouse_birth_date' : 'birth_date'}', this.value)">
+                    ${this._renderDateInput(isSM ? 'spouse_birth_date' : 'birth_date', birthDate, birthCal)}
                     <button class="pe-unknown-btn ${!birthDate ? 'pe-unknown-active' : ''}" onclick="app._editSetUnknown('${isSM ? 'spouse_birth_date' : 'birth_date'}')">不详</button>
                 </div>
             </div>
@@ -1164,7 +1210,7 @@ class ZupuApp {
                 <div class="pe-section-header">去世信息</div>
                 <div class="pe-date-row">
                     <span class="pe-field-label">去世日期：</span>
-                    <input type="date" class="pe-date-input" id="edit-${isSM ? 'spouse_death_date' : 'death_date'}" value="${deathDate}" min="1736-01-01" onchange="app._editOnDateChange('${isSM ? 'spouse_death_date' : 'death_date'}', this.value)">
+                    ${this._renderDateInput(isSM ? 'spouse_death_date' : 'death_date', deathDate, birthCal)}
                     <button class="pe-unknown-btn ${!deathDate ? 'pe-unknown-active' : ''}" onclick="app._editSetUnknown('${isSM ? 'spouse_death_date' : 'death_date'}')">不详</button>
                 </div>
                 ${deathHint ? `<div class="pe-death-age">${deathHint}</div>` : ''}
@@ -1306,7 +1352,7 @@ class ZupuApp {
                 <div class="pe-section-header">出生信息</div>
                 <div class="pe-date-row">
                     <span class="pe-field-label">出生日期：</span>
-                    <input type="date" class="pe-date-input" value="${f.spouse_birth_date}" min="1736-01-01" onchange="app._editOnDateChange('spouse_birth_date', this.value)">
+                    ${this._renderDateInput('spouse_birth_date', f.spouse_birth_date, f.spouse_birth_calendar)}
                     <button class="pe-unknown-btn ${!f.spouse_birth_date ? 'pe-unknown-active' : ''}" onclick="app._editSetUnknown('spouse_birth_date')">不详</button>
                 </div>
             </div>
@@ -1317,7 +1363,7 @@ class ZupuApp {
                 <div class="pe-section-header">去世信息</div>
                 <div class="pe-date-row">
                     <span class="pe-field-label">去世日期：</span>
-                    <input type="date" class="pe-date-input" value="${f.spouse_death_date}" min="1736-01-01" onchange="app._editOnDateChange('spouse_death_date', this.value)">
+                    ${this._renderDateInput('spouse_death_date', f.spouse_death_date, f.spouse_birth_calendar)}
                     <button class="pe-unknown-btn ${!f.spouse_death_date ? 'pe-unknown-active' : ''}" onclick="app._editSetUnknown('spouse_death_date')">不详</button>
                 </div>
                 ${st.spouseDeathAgeHint ? `<div class="pe-death-age">${st.spouseDeathAgeHint}</div>` : ''}
@@ -1372,6 +1418,74 @@ class ZupuApp {
         // 输入姓名时自动推送字辈
         if (field === 'name' && !this._editState.form.generation && this._editState.form.shi_xi && !this._editState.isSpouseMode) {
             this._autoFillGeneration(this._editState.form.shi_xi);
+        }
+        // ★★★ 对齐小程序：历法切换时联动修改另一个历法+日期转换
+        if (field.includes('calendar')) {
+            const st = this._editState;
+            const f = st.form;
+            const isBirth = field.includes('birth');
+            const who = field.startsWith('spouse') ? 'spouse' : 'self';
+            const alive = who === 'spouse' ? Number(f.spouse_alive) !== 0 : Number(f.is_alive) !== 0;
+
+            // ★★★ 对齐小程序：出生历法切换→联动修改去世历法为相同值
+            if (isBirth) {
+                const deathCalendarField = who === 'spouse' ? 'spouse_death_calendar' : 'death_calendar';
+                f[deathCalendarField] = value;
+            }
+
+            // 转换当前日期
+            const dateField = field.replace('_calendar', '_date');
+            const curVal = f[dateField];
+            if (value === '农历') {
+                // 公历→农历
+                if (curVal && curVal.trim() !== '') {
+                    let l = null;
+                    if (!curVal.includes('(闰)')) {
+                        const parts = curVal.split('-');
+                        if (parts.length === 3) l = lunarUtil.solarToLunar(parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2]));
+                    }
+                    const lunar = l || { year: 2000, month: 1, day: 1, isLeapMonth: false };
+                    f[dateField] = lunarUtil.formatLunarDate(lunar.year, lunar.month, lunar.day, lunar.isLeapMonth);
+                }
+                // ★★★ 对齐小程序：如果是出生历法切换，同时转换去世日期
+                if (isBirth && !alive) {
+                    const deathDateField = who === 'spouse' ? 'spouse_death_date' : 'death_date';
+                    const deathVal = f[deathDateField];
+                    if (deathVal && deathVal.trim() !== '') {
+                        let l = null;
+                        if (!deathVal.includes('(闰)')) {
+                            const parts = deathVal.split('-');
+                            if (parts.length === 3) l = lunarUtil.solarToLunar(parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2]));
+                        }
+                        const lunar = l || { year: 2000, month: 1, day: 1, isLeapMonth: false };
+                        f[deathDateField] = lunarUtil.formatLunarDate(lunar.year, lunar.month, lunar.day, lunar.isLeapMonth);
+                    }
+                }
+            } else {
+                // 农历→公历
+                if (curVal && curVal.includes('(闰)')) {
+                    const l = lunarUtil.parseLunarDate(curVal);
+                    if (l) {
+                        const s = lunarUtil.lunarToSolar(l.year, l.month, l.day, l.isLeapMonth);
+                        if (s) f[dateField] = `${s.year}-${String(s.month).padStart(2, '0')}-${String(s.day).padStart(2, '0')}`;
+                    }
+                }
+                // ★★★ 对齐小程序：如果是出生历法切换，同时转换去世日期
+                if (isBirth && !alive) {
+                    const deathDateField = who === 'spouse' ? 'spouse_death_date' : 'death_date';
+                    const deathVal = f[deathDateField];
+                    if (deathVal && deathVal.includes('(闰)')) {
+                        const l = lunarUtil.parseLunarDate(deathVal);
+                        if (l) {
+                            const s = lunarUtil.lunarToSolar(l.year, l.month, l.day, l.isLeapMonth);
+                            if (s) f[deathDateField] = `${s.year}-${String(s.month).padStart(2, '0')}-${String(s.day).padStart(2, '0')}`;
+                        }
+                    }
+                }
+            }
+            this._renderPersonEdit();
+            this._refreshDeathAgeHint();
+            this._refreshSpouseDeathAgeHint();
         }
     }
 
@@ -1468,6 +1582,36 @@ class ZupuApp {
             const hint = field.startsWith('spouse') ? this._editState.spouseDeathAgeHint : this._editState.deathAgeHint;
             if (hintEl) hintEl.textContent = hint;
         }
+    }
+
+    /** 处理农历部件变化 */
+    _editOnLunarPartChange(field, part, value) {
+        const st = this._editState;
+        const curValue = st.form[field];
+        const lunar = lunarUtil.parseLunarDate(curValue) || { year: 2000, month: 1, day: 1, isLeapMonth: false };
+
+        if (part === 'year') {
+            lunar.year = parseInt(value);
+        } else if (part === 'month') {
+            const months = lunarUtil.getLunarMonthList(lunar.year);
+            const m = months[parseInt(value)];
+            lunar.month = m.month;
+            lunar.isLeapMonth = m.isLeap;
+        } else if (part === 'day') {
+            lunar.day = parseInt(value);
+        }
+
+        // 校验日期合法性（月份天数可能因年/月变化）
+        const days = lunarUtil.getLunarDayList(lunar.year, lunar.month, lunar.isLeapMonth);
+        if (lunar.day > days.length) lunar.day = days.length;
+
+        const newValue = lunarUtil.formatLunarDate(lunar.year, lunar.month, lunar.day, lunar.isLeapMonth);
+        st.form[field] = newValue;
+
+        // 重新渲染编辑区域（为了更新月份/日期列表）
+        this._renderPersonEdit();
+        this._refreshDeathAgeHint();
+        this._refreshSpouseDeathAgeHint();
     }
 
     _editSetUnknown(field) {
@@ -2414,6 +2558,192 @@ class ZupuApp {
         </div>`;
     }
 
+    // ═══ 管理中心（对齐小程序admin-center） ═══
+    async loadAdminCenter() {
+        if (!isAdmin()) { showToast('仅管理员可访问', 'error'); this.navigateTo('home'); return; }
+        showLoading();
+        try {
+            let unreadCount = 0;
+            if (isAdmin()) {
+                try {
+                    const res = await api.getUnreadMessageCount();
+                    if (res.status === 'success') unreadCount = res.count || 0;
+                } catch (e) {}
+            }
+            this.renderAdminCenter(unreadCount);
+        } catch (e) { showToast('加载失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    renderAdminCenter(unreadCount) {
+        const container = document.getElementById('admin-center-content');
+        if (!container) return;
+        const isAdminRole = isAdmin();
+        const isSuperAdminRole = isSuperAdmin();
+
+        container.innerHTML = `
+        <div class="section-toolbar">
+            <button class="btn btn-small btn-outline" onclick="app.navigateTo('home')"><i class="fas fa-arrow-left"></i> 返回</button>
+            <h3><i class="fas fa-shield-alt"></i> 管理中心</h3>
+        </div>
+        <div class="card admin-center-card" onclick="app.navigateTo('admin-accounts')">
+            <div class="ac-icon" style="background:#e3f2fd;color:#1565c0;"><i class="fas fa-user-shield"></i></div>
+            <div class="ac-info"><div class="ac-title">帐号管理</div><div class="ac-desc">管理用户认证、角色、绑定</div></div>
+            <i class="fas fa-chevron-right ac-arrow"></i>
+        </div>
+        <div class="card admin-center-card" onclick="app.navigateTo('messages')">
+            <div class="ac-icon" style="background:#fff3e0;color:#e65100;"><i class="fas fa-envelope"></i></div>
+            <div class="ac-info"><div class="ac-title">留言信箱${unreadCount > 0 ? `<span class="badge-danger" style="margin-left:6px;">${unreadCount > 99 ? '99+' : unreadCount}</span>` : ''}</div><div class="ac-desc">查看和管理用户留言</div></div>
+            <i class="fas fa-chevron-right ac-arrow"></i>
+        </div>
+        <div class="card admin-center-card" onclick="app.navigateTo('announcement-manage')">
+            <div class="ac-icon" style="background:#f3e5f5;color:#7b1fa2;"><i class="fas fa-bullhorn"></i></div>
+            <div class="ac-info"><div class="ac-title">公告管理</div><div class="ac-desc">创建、编辑和发布公告</div></div>
+            <i class="fas fa-chevron-right ac-arrow"></i>
+        </div>
+        ${isSuperAdminRole ? `
+        <div class="card admin-center-card" onclick="app.navigateTo('worship-admin')">
+            <div class="ac-icon" style="background:#fce4ec;color:#c62828;"><i class="fas fa-cog"></i></div>
+            <div class="ac-info"><div class="ac-title">祭拜设置</div><div class="ac-desc">配置上香规则和功德积分</div></div>
+            <i class="fas fa-chevron-right ac-arrow"></i>
+        </div>
+        <div class="card admin-center-card" onclick="app.navigateTo('db-backup')">
+            <div class="ac-icon" style="background:#e8f5e9;color:#2e7d32;"><i class="fas fa-database"></i></div>
+            <div class="ac-info"><div class="ac-title">数据备份</div><div class="ac-desc">备份数据库到云存储，恢复历史数据</div></div>
+            <i class="fas fa-chevron-right ac-arrow"></i>
+        </div>
+        ` : ''}
+        <div style="text-align:center;margin-top:20px;color:var(--text-muted);font-size:13px;">
+            <i class="fas fa-info-circle"></i> 仅管理员和超级管理员可访问此页面
+        </div>`;
+    }
+
+    // ═══ 数据备份与恢复（对齐小程序db-backup，仅超管） ═══
+    _dbBackupState = { backups: [], isBackingUp: false, isRestoring: false, showConfirmModal: false, confirmRestoreKey: '', confirmRestoreDate: '', confirmInput: '' };
+
+    async loadDbBackup() {
+        if (!isSuperAdmin()) { showToast('仅超级管理员可访问', 'error'); this.navigateTo('home'); return; }
+        showLoading();
+        try {
+            const res = await api.dbBackupList();
+            if (res.status === 'success') {
+                this._dbBackupState.backups = res.data || [];
+            }
+            this.renderDbBackup();
+        } catch (e) { showToast('加载备份列表失败', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    renderDbBackup() {
+        const container = document.getElementById('db-backup-content');
+        if (!container) return;
+        const st = this._dbBackupState;
+        const backups = st.backups || [];
+
+        container.innerHTML = `
+        <div class="section-toolbar">
+            <button class="btn btn-small btn-outline" onclick="app.navigateTo('admin-center')"><i class="fas fa-arrow-left"></i> 返回</button>
+            <h3><i class="fas fa-database"></i> 数据备份与恢复</h3>
+        </div>
+        <div class="card">
+            <button class="btn btn-primary btn-block" onclick="app.onDbBackup()" ${st.isBackingUp ? 'disabled' : ''}>
+                <i class="fas fa-cloud-upload-alt"></i> ${st.isBackingUp ? '备份中...' : '一键备份数据库'}
+            </button>
+            <p style="font-size:12px;color:var(--text-muted);margin-top:8px;text-align:center;">
+                备份全量数据库到云存储，最多保留10份
+            </p>
+        </div>
+        <div class="card mt-20">
+            <h3><i class="fas fa-history"></i> 备份记录 (${backups.length})</h3>
+            ${backups.length === 0 ? '<p style="color:var(--text-muted);text-align:center;padding:20px;">暂无备份记录</p>' :
+            backups.map((b, i) => `
+            <div class="backup-item">
+                <div class="backup-info">
+                    <div class="backup-date">${b.uploaded_beijing || b.uploaded_at || '未知时间'}</div>
+                    <div class="backup-meta">
+                        ${b.people_count !== undefined ? `人员: ${b.people_count}人` : ''}
+                        ${b.size ? ` · 大小: ${(b.size / 1024).toFixed(1)}KB` : ''}
+                        ${b.table_count ? ` · 表数: ${b.table_count}` : ''}
+                    </div>
+                </div>
+                <button class="btn btn-small btn-danger" onclick="app.onDbRestoreConfirm('${b.key || ''}', '${b.uploaded_beijing || b.uploaded_at || ''}')" ${st.isRestoring ? 'disabled' : ''}>
+                    <i class="fas fa-undo"></i> 恢复
+                </button>
+            </div>`).join('')}
+        </div>
+        ${st.showConfirmModal ? `
+        <div class="modal" style="display:flex;">
+            <div class="modal-content modal-small">
+                <div class="modal-header"><h3>⚠️ 确认恢复数据</h3><button class="modal-close" onclick="app._cancelDbRestore()">&times;</button></div>
+                <div class="modal-body">
+                    <p style="color:var(--danger);font-weight:bold;">此操作将用备份数据覆盖当前数据库，不可逆！</p>
+                    <p>恢复目标：${st.confirmRestoreDate}</p>
+                    <p style="margin-top:12px;">请输入 <strong>确认恢复</strong> 以继续：</p>
+                    <input type="text" id="db-restore-confirm-input" class="pe-input" placeholder="请输入"确认恢复"" oninput="app._dbBackupState.confirmInput=this.value">
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" onclick="app._cancelDbRestore()">取消</button>
+                    <button class="btn btn-danger" onclick="app._doDbRestore()" ${st.confirmInput !== '确认恢复' ? 'disabled' : ''}>确认恢复</button>
+                </div>
+            </div>
+        </div>` : ''}`;
+    }
+
+    async onDbBackup() {
+        const st = this._dbBackupState;
+        if (st.isBackingUp) return;
+        this.showConfirm('备份数据库', '确定将当前全量数据库备份到云存储吗？', async () => {
+            st.isBackingUp = true;
+            this.renderDbBackup();
+            try {
+                const res = await api.dbBackupCreate();
+                if (res.status === 'success') {
+                    showToast('备份成功', 'success');
+                    st.backups = res.data ? [res.data, ...st.backups].slice(0, 10) : st.backups;
+                    this.loadDbBackup();
+                } else showToast(res.message || '备份失败', 'error');
+            } catch (e) { showToast('备份失败', 'error'); }
+            finally { st.isBackingUp = false; this.renderDbBackup(); }
+        });
+    }
+
+    onDbRestoreConfirm(key, date) {
+        const st = this._dbBackupState;
+        st.showConfirmModal = true;
+        st.confirmRestoreKey = key;
+        st.confirmRestoreDate = date;
+        st.confirmInput = '';
+        this.renderDbBackup();
+    }
+
+    _cancelDbRestore() {
+        const st = this._dbBackupState;
+        st.showConfirmModal = false;
+        st.confirmRestoreKey = '';
+        st.confirmRestoreDate = '';
+        st.confirmInput = '';
+        this.renderDbBackup();
+    }
+
+    async _doDbRestore() {
+        const st = this._dbBackupState;
+        if (st.confirmInput !== '确认恢复') { showToast('请输入"确认恢复"', 'error'); return; }
+        st.isRestoring = true;
+        st.showConfirmModal = false;
+        this.renderDbBackup();
+        showLoading();
+        try {
+            const res = await api.dbBackupRestore(st.confirmRestoreKey, true);
+            if (res.status === 'success') {
+                showToast('数据恢复成功', 'success');
+                clearApiCache();
+                this.peopleData = [];
+                this.loadDbBackup();
+            } else showToast(res.message || '恢复失败', 'error');
+        } catch (e) { showToast('恢复失败', 'error'); }
+        finally { st.isRestoring = false; st.confirmRestoreKey = ''; hideLoading(); this.renderDbBackup(); }
+    }
+
     // ═══ 帐号管理 ═══
     async loadAdminAccounts() {
         showLoading();
@@ -2469,12 +2799,17 @@ class ZupuApp {
                     <div>李氏号: ${a.li_shi_id || '-'}</div>
                     <div>绑定: ${a.person_name || '-'}</div>
                     <div>登录: ${a.last_login_at ? timeAgo(a.last_login_at) : '-'}</div>
+                    ${a.self_bind_attempts > 0 && a.self_bind_disabled !== 1 ? '<div style="color:#e74c3c;font-size:12px;">⚠️ 绑定失败' + a.self_bind_attempts + '次</div>' : ''}
+                    ${a.self_bind_disabled === 1 && a.self_bind_attempts === 0 ? '<div style="color:#999;font-size:12px;">用户不想认证</div>' : ''}
+                    ${a.self_bind_disabled === 1 && a.self_bind_attempts > 0 ? '<div style="color:#e74c3c;font-size:12px;">🔒 绑定失败' + a.self_bind_attempts + '次(已锁定)</div>' : ''}
                 </div>
                 <div class="admin-card-actions">
                     ${a.verified !== 1 ? `<button class="btn btn-small btn-outline" onclick="app.verifyMember('${a.li_shi_id}')">认证</button>` : ''}
                     ${a.verified === 1 && isSuperAdmin ? `<button class="btn btn-small btn-outline" onclick="app.unverifyMember('${a.li_shi_id}')">取消认证</button>` : ''}
                     <button class="btn btn-small btn-outline" onclick="app.adminBindPerson('${a.li_shi_id}')">绑定人物</button>
+                    ${a.person_id ? `<button class="btn btn-small btn-outline" onclick="app.adminUnbindPerson('${a.li_shi_id}')">解绑</button>` : ''}
                     ${isSuperAdmin ? `<button class="btn btn-small btn-outline" onclick="app.changeRole('${a.li_shi_id}')">改角色</button>` : ''}
+                    ${isSuperAdmin ? `<button class="btn btn-small btn-outline" onclick="app.adminResetPassword('${a.li_shi_id}')">重置密码</button>` : ''}
                 </div>
             </div>`;
         }).join('');
@@ -2514,8 +2849,8 @@ class ZupuApp {
     }
 
     changeRole(liShiId) {
-        const roles = ['user', 'member', 'admin'];
-        const roleLabels = { user: '未认证', member: '家族成员', admin: '管理员' };
+        const roles = ['user', 'member', 'admin', 'super_admin'];
+        const roleLabels = { user: '未认证', member: '家族成员', admin: '管理员', super_admin: '超级管理员' };
         const body = `<div class="form-group"><label>选择角色</label><select id="change-role-select">${roles.map(r => `<option value="${r}">${roleLabels[r]}</option>`).join('')}</select></div>`;
         this.showDynamicModal('修改角色', body, () => this._doChangeRole(liShiId));
     }
