@@ -687,7 +687,7 @@ class ZupuApp {
             <div class="detail-grid">
                 ${p.alias?`<div class="detail-item"><div class="detail-item-label">别名</div><div class="detail-item-value">${p.alias}</div></div>`:''}
                 <div class="detail-item"><div class="detail-item-label">排行</div><div class="detail-item-value">${p.ranking||'-'}</div></div>
-                <div class="detail-item"><div class="detail-item-label">父亲</div><div class="detail-item-value">${father?`<a href="javascript:app.navigateTo('person-detail',{id:${father.id}})">${getDisplayName(father)}</a>`:'-'}</div></div>
+                ${spouse ? `<div class="detail-item"><div class="detail-item-label">亲属关系</div><div class="detail-item-value" style="color:#e91e63;">${this._getSpouseOfName(p)}的妻子</div></div>` : `<div class="detail-item"><div class="detail-item-label">父亲</div><div class="detail-item-value">${father?`<a href="javascript:app.navigateTo('person-detail',{id:${father.id}})">${getDisplayName(father)}</a>`:'-'}</div></div>`}
                 <div class="detail-item"><div class="detail-item-label">出生</div><div class="detail-item-value">${p.birth_date||'-'}${p.birth_calendar?`(${p.birth_calendar})`:''}</div></div>
                 ${!alive && p.death_date ? `<div class="detail-item"><div class="detail-item-label">去世</div><div class="detail-item-value">${p.death_date}${p.death_calendar?`(${p.death_calendar})`:''}</div></div>` : ''}
                 ${deathAge!==null?`<div class="detail-item"><div class="detail-item-label">享年</div><div class="detail-item-value">${deathAge}岁</div></div>`:''}
@@ -726,6 +726,14 @@ class ZupuApp {
             ${canDelete?`<button class="btn btn-danger" onclick="app.deletePerson(${p.id})"><i class="fas fa-trash"></i> 删除</button>`:''}
             ${isAdmin()?`<button class="btn btn-outline" onclick="app.createBindToken(${p.id})"><i class="fas fa-share-alt"></i> 邀请链接</button>`:''}
         </div>`;
+    }
+
+    /** ★ 获取配偶所属户主名称 */
+    _getSpouseOfName(spousePerson) {
+        const ownerId = spousePerson.spouse_of_id;
+        if (!ownerId) return '';
+        const owner = this.peopleDict[ownerId];
+        return owner ? (owner.name || getDisplayName(owner)) : '';
     }
 
     async bindPerson(personId) {
@@ -797,7 +805,7 @@ class ZupuApp {
             spouse_sort: '', spouse_birth_place: '', spouse_live_place: '',
             spouse_move_info: '', spouse_remark: '', spouse_bio: '',
         },
-        submitting: false, deathAgeHint: '', spouseDeathAgeHint: '',
+        submitting: false, deathAgeHint: '', spouseDeathAgeHint: '', spouseOfName: '',
     };
 
     async loadPersonEdit(params) {
@@ -808,7 +816,7 @@ class ZupuApp {
         st.relation = ''; st.targetId = ''; st.targetName = '';
         st.otherImages = []; st.spouseOtherImages = [];
         st.adoptFatherList = []; st.submitting = false;
-        st.deathAgeHint = ''; st.spouseDeathAgeHint = '';
+        st.deathAgeHint = ''; st.spouseDeathAgeHint = ''; st.spouseOfName = '';
         // 重置form
         Object.assign(st.form, {
             name:'',alias:'',phone:'',gender:'男',is_alive:1,death_date:'',death_calendar:'农历',
@@ -852,6 +860,10 @@ class ZupuApp {
             // 新增模式：字辈为空但有世系值时自动推送
             if (!isSpouseMode && !st.form.generation && st.form.shi_xi) {
                 this._autoFillGeneration(st.form.shi_xi);
+            }
+            // ★ 新增配偶模式：设置户主名称
+            if (isSpouseMode && st.targetName) {
+                st.spouseOfName = st.targetName;
             }
         }
         this._renderPersonEdit();
@@ -949,6 +961,12 @@ class ZupuApp {
                 st.isSpouseMode = isSpouseMode;
                 st.otherImages = otherImages;
                 st.spouseOtherImages = spouseOtherImages;
+                // ★ 配偶模式：获取户主名称用于显示"亲属关系：XXX的妻子"
+                if (isSpouseMode && person.spouse_of_id) {
+                    const peopleData = peopleRes.status === 'success' ? (peopleRes.data || []) : [];
+                    const houseOwner = peopleData.find(p => String(p.id) === String(person.spouse_of_id));
+                    st.spouseOfName = houseOwner ? (houseOwner.name || getDisplayName(houseOwner)) : '';
+                }
                 this._refreshDeathAgeHint();
                 this._refreshSpouseDeathAgeHint();
 
@@ -1096,7 +1114,9 @@ class ZupuApp {
             <div class="pe-spouse-hint">
                 <span class="pe-hint-icon">💑</span>
                 <span class="pe-hint-text">配偶模式 — 只录入基础个人信息，不用世系/字辈/父亲/排行</span>
-            </div>` : ''}
+            </div>
+            ${st.spouseOfName ? `<div class="pe-relation-hint"><span class="pe-relation-hint-icon">💕</span><span class="pe-relation-hint-text">亲属关系：${st.spouseOfName}的妻子</span></div>` : ''}
+            ` : ''}
 
             <!-- 姓名+头像区 -->
             <div class="pe-card pe-avatar-name-card">
