@@ -1769,3 +1769,17 @@ img.lazy-loaded { opacity: 1; }
 #tree-announcement-bar:not(.hidden), #baota-announcement-bar:not(.hidden) {
     display: flex;
 }
+
+/* ★ 配偶模式：亲属关系提示条 */
+.pe-relation-hint {
+    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+    border-radius: 12px;
+    padding: 14px 20px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 3px 10px rgba(255, 152, 0, 0.12);
+}
+.pe-relation-hint-icon { font-size: 20px; flex-shrink: 0; }
+.pe-relation-hint-text { font-size: 15px; color: #e65100; font-weight: 600; }
